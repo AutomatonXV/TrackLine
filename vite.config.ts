@@ -3,5 +3,7 @@ import { defineConfig } from 'vite'
 
 // https://vite.dev/config/
 export default defineConfig({
+  base: './',
   plugins: [react()],
+  // ...keep the rest of your config as it is
 })

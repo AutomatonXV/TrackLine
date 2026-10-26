@@ -634,7 +634,7 @@ export default function App() {
 
   return <main className="app">
     <header className="bar">
-      <div className="brand"><span className="brand-mark"><Activity size={16} strokeWidth={2.5} /></span><span className="brand-word">Fastrack</span></div>
+      <div className="brand"><span className="brand-mark"><Activity size={16} strokeWidth={2.5} /></span><span className="brand-word">TrackLine</span></div>
       <SlotCard label="MY LAP" swatch={mineColor} slot={slots.mine} onPick={() => void pickSlot('mine')} onClear={() => clearSlot('mine')} onLap={(index) => changeLap('mine', index)} onDropFiles={(files) => void dropOnSlot('mine', files)} />
       <SlotCard label="REFERENCE" swatch="#ffffff" slot={slots.ref} onPick={() => void pickSlot('ref')} onClear={() => clearSlot('ref')} onLap={(index) => changeLap('ref', index)} onDropFiles={(files) => void dropOnSlot('ref', files)} />
       {slots.mine && !slots.ref && <button className="use-fastest" onClick={() => void useFastestAsReference()}>Use my fastest as reference</button>}
