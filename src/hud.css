@@ -1,0 +1,34 @@
+html.hud-page, html.hud-page body, html.hud-page #root { background: transparent; min-width: 0; min-height: 0; overflow: hidden; }
+html.hud-page body { background: transparent; }
+.hud-root { position: relative; transform-origin: top left; font-family: var(--mono); user-select: none; overflow: hidden; }
+.hud-root.windowed { background: #101314; }
+.hud-root.editing { -webkit-app-region: drag; }
+.hud-root.editing::after { content: ''; position: absolute; inset: 4px; border: 2px dashed #ffb020; border-radius: 50%; pointer-events: none; }
+.hud-disk { fill: transparent; }
+.hud-arc-bg { fill: none; stroke: rgba(255, 255, 255, .06); stroke-width: 18; stroke-linecap: butt; }
+.hud-arc-fill { fill: none; stroke-width: 18; stroke-linecap: butt; opacity: .55; }
+.hud-arc-ghost { fill: none; stroke: rgba(255, 255, 255, .38); stroke-width: 5; stroke-linecap: butt; }
+.hud-ideal { stroke: #fff; stroke-width: 5; stroke-linecap: round; }
+.hud-ideal.off { stroke: #ffb020; }
+.hud-knob { stroke: #fff; stroke-width: 3; }
+.hud-text { font-family: var(--mono); font-size: 14px; font-weight: 700; letter-spacing: .04em; }
+.hud-big { font-family: var(--mono); font-size: 22px; font-weight: 700; fill: #fff; }
+.hud-big.off { fill: #ffb020; }
+.hud-small { font-family: var(--mono); font-size: 10px; letter-spacing: .08em; fill: #9aa0aa; }
+.hud-gear { font-family: var(--mono); font-size: 150px; font-weight: 800; fill: rgba(255, 255, 255, .13); }
+.hud-speed { font-family: var(--mono); font-size: 28px; font-weight: 700; fill: #fff; }
+.hud-warn-arc { fill: none; stroke-width: 10; stroke-linecap: butt; stroke-dasharray: 1; animation: hud-sweep .18s ease-out both; }
+.hud-warn { animation: hud-flash .3s steps(1, end) infinite; }
+@keyframes hud-sweep { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes hud-flash { 0% { opacity: 1; } 60% { opacity: .35; } }
+.hud-rpm-bg { fill: none; stroke: rgba(255, 255, 255, .06); stroke-width: 10; stroke-linecap: butt; }
+.hud-rpm-fill { fill: none; stroke: #3fc8ff; stroke-width: 10; stroke-linecap: butt; opacity: .55; }
+.hud-rpm-fill.yellow { stroke: #ffd60a; }
+.hud-rpm-fill.red { stroke: #ff3b30; animation: hud-rpm-blink .16s steps(1, end) infinite; }
+.hud-rpm-mark { stroke: rgba(255, 255, 255, .55); stroke-width: 2; }
+@keyframes hud-rpm-blink { 0% { opacity: 1; } 50% { opacity: .15; } }
+.hud-coach { font-family: var(--mono); font-size: 12px; font-weight: 700; fill: #ffd60a; paint-order: stroke; stroke: rgba(0, 0, 0, .6); stroke-width: 3px; }
+.hud-heading { stroke: rgba(255, 255, 255, .2); stroke-dasharray: 4 4; stroke-width: 2; }
+.hud-car { fill: #3fc8ff; }
+.hud-scale { stroke: rgba(255, 255, 255, .4); stroke-width: 2; }
+.hud-grip { position: absolute; right: 30px; bottom: 30px; width: 24px; height: 24px; background: linear-gradient(135deg, transparent 50%, #ffb020 50%); cursor: nwse-resize; -webkit-app-region: no-drag; }

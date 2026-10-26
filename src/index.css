@@ -1,0 +1,6 @@
+:root { font-family: 'Bahnschrift', 'Trebuchet MS', sans-serif; color: #e9ece8; background: #101314; font-synthesis: none; text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; --bg: #101314; --panel: #171c1d; --line: #2b3332; --muted: #828b87; --red: #f04d4f; --green: #a9e36e; --amber: #e5b861; --mono: 'Cascadia Code', Consolas, monospace; --display: 'Bahnschrift Condensed', 'Arial Narrow', sans-serif; }
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 1000px; min-height: 100vh; background: radial-gradient(ellipse at 58% -20%, #27302e 0, transparent 46%), var(--bg); }
+button, select { font: inherit; }
+button { color: inherit; cursor: pointer; }
+#root { min-height: 100vh; }
