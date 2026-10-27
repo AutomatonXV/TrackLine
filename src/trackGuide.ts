@@ -13,6 +13,9 @@ export interface GuideCorner {
   number: number
   direction: 'left' | 'right'
   character: 'tight' | 'medium' | 'flowing'
+  startIndex: number
+  apexIndex: number
+  endIndex: number
   points: { approach: GuidePoint; turnIn: GuidePoint; apex: GuidePoint; exit: GuidePoint }
   line: GuidePoint[]
 }
@@ -232,6 +235,9 @@ function guideFor(track: GuideTrack): TrackGuide {
       number: index + 1,
       direction: corner.sign > 0 ? 'left' : 'right',
       character: corner.character,
+      startIndex: wrap(entry, SAMPLE_COUNT),
+      apexIndex: wrap(corner.apex, SAMPLE_COUNT),
+      endIndex: wrap(exit, SAMPLE_COUNT),
       points: {
         approach: pointAt(fitted.racingLine, entry),
         turnIn: pointAt(fitted.racingLine, turnIn),

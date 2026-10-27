@@ -43,6 +43,9 @@ test('generates finite corner and racing-line guidance for every bundled circuit
         assert.ok(['left', 'right'].includes(corner.direction))
         assert.ok(['tight', 'medium', 'flowing'].includes(corner.character))
         assert.ok(corner.line.length >= 3)
+        for (const index of [corner.startIndex, corner.apexIndex, corner.endIndex]) {
+          assert.ok(Number.isInteger(index) && index >= 0 && index < guide.racingLine.length)
+        }
         for (const point of [corner.points.approach, corner.points.turnIn, corner.points.apex, corner.points.exit, ...corner.line]) {
           assert.ok(Number.isFinite(point.x) && Number.isFinite(point.y), `${track} turn ${corner.number} contains an invalid point`)
           assert.ok(point.x >= 0 && point.x <= 1000 && point.y >= 0 && point.y <= 1000, `${track} turn ${corner.number} is off the map`)
