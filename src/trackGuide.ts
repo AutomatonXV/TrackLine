@@ -1,6 +1,9 @@
-import monzaSvg from '../public/tracks/monza.svg?raw'
-import spaSvg from '../public/tracks/spa.svg?raw'
-import nurburgringSvg from '../public/tracks/nurburgring.svg?raw'
+import monzaTrack from './data/tumftm/tracks/monza.csv?raw'
+import spaTrack from './data/tumftm/tracks/spa.csv?raw'
+import nurburgringTrack from './data/tumftm/tracks/nurburgring.csv?raw'
+import monzaLine from './data/tumftm/racelines/monza.csv?raw'
+import spaLine from './data/tumftm/racelines/spa.csv?raw'
+import nurburgringLine from './data/tumftm/racelines/nurburgring.csv?raw'
 
 export const GUIDE_TRACKS = ['Monza', 'Spa-Francorchamps', 'Nürburgring GP'] as const
 export type GuideTrack = typeof GUIDE_TRACKS[number]
@@ -13,64 +16,134 @@ export interface GuideCorner {
   points: { approach: GuidePoint; turnIn: GuidePoint; apex: GuidePoint; exit: GuidePoint }
   line: GuidePoint[]
 }
-export interface TrackGuide { track: GuideTrack; outline: GuidePoint[]; corners: GuideCorner[] }
-
-const SOURCES: Record<GuideTrack, string> = {
-  Monza: monzaSvg,
-  'Spa-Francorchamps': spaSvg,
-  'Nürburgring GP': nurburgringSvg,
+export interface TrackGuide {
+  track: GuideTrack
+  lengthMeters: number
+  leftEdge: GuidePoint[]
+  rightEdge: GuidePoint[]
+  centerline: GuidePoint[]
+  racingLine: GuidePoint[]
+  corners: GuideCorner[]
 }
 
-const SAMPLE_COUNT = 360
-const INDEX_WINDOW = 3
-const TURN_THRESHOLD = 0.015
-const CORNER_THRESHOLD = 0.25
-const MERGE_GAP = 10
-const TRACK_OFFSET = 4.5
+interface TrackPoint extends GuidePoint { rightWidth: number; leftWidth: number }
+
+const SOURCES: Record<GuideTrack, { track: string; line: string }> = {
+  Monza: { track: monzaTrack, line: monzaLine },
+  'Spa-Francorchamps': { track: spaTrack, line: spaLine },
+  'Nürburgring GP': { track: nurburgringTrack, line: nurburgringLine },
+}
+
+const SAMPLE_COUNT = 1200
+const TURN_THRESHOLD = 0.006
+const CORNER_THRESHOLD = 0.22
+const MERGE_GAP = 8
+const MARKER_APPROACH = 14
+const MARKER_TURN_IN = 4
 
 const wrap = (index: number, length: number) => ((index % length) + length) % length
 const distance = (a: GuidePoint, b: GuidePoint) => Math.hypot(b.x - a.x, b.y - a.y)
 
-function routeFromSvg(svg: string): GuidePoint[] {
-  const viewBox = svg.match(/viewBox="([^"]+)"/)?.[1]
-  const path = svg.match(/<path\b[^>]*\bd="([^"]+)"/)?.[1]
-  if (!viewBox || !path) throw new Error('The bundled track map has no usable route geometry.')
-  const [minX, minY, width, height] = viewBox.split(/\s+/).map(Number)
-  const numbers = path.match(/[-+]?(?:\d*\.?\d+)(?:e[-+]?\d+)?/gi)?.map(Number)
-  if (!numbers || numbers.length < 8 || numbers.length % 2 !== 0 || !numbers.every(Number.isFinite)) {
-    throw new Error('The bundled track route contains invalid geometry.')
-  }
-  const points = Array.from({ length: numbers.length / 2 }, (_, index) => ({
-    x: numbers[index * 2],
-    y: numbers[index * 2 + 1],
-  }))
-  if (distance(points[0], points[points.length - 1]) < 0.01) points.pop()
-  return points.map((point) => ({
-    x: (point.x - minX) * 1000 / width,
-    y: (point.y - minY) * 1000 / height,
-  }))
+function parseTrack(content: string): TrackPoint[] {
+  return content.split(/\r?\n/)
+    .filter((line) => line.length > 0 && !line.startsWith('#'))
+    .map((line) => {
+      const [x, y, rightWidth, leftWidth] = line.split(',').map(Number)
+      if (![x, y, rightWidth, leftWidth].every(Number.isFinite) || rightWidth <= 0 || leftWidth <= 0) {
+        throw new Error('The bundled track centerline contains invalid coordinates or widths.')
+      }
+      return { x, y, rightWidth, leftWidth }
+    })
 }
 
-function resampleClosed(points: GuidePoint[]): GuidePoint[] {
+function parseRacingLine(content: string): GuidePoint[] {
+  return content.split(/\r?\n/)
+    .filter((line) => line.length > 0 && !line.startsWith('#'))
+    .map((line) => {
+      const [x, y] = line.split(',').map(Number)
+      if (![x, y].every(Number.isFinite)) {
+        throw new Error('The bundled optimized racing line contains invalid coordinates.')
+      }
+      return { x, y }
+    })
+}
+
+function pathLength(points: GuidePoint[]) {
+  return points.reduce((length, point, index) => length + distance(point, points[(index + 1) % points.length]), 0)
+}
+
+function resampleClosed<T extends GuidePoint>(points: T[], count: number, interpolate: (current: T, next: T, amount: number) => T): T[] {
+  if (points.length < 3) throw new Error('The bundled circuit geometry has too few points.')
   const lengths = points.map((point, index) => distance(point, points[(index + 1) % points.length]))
   const total = lengths.reduce((sum, length) => sum + length, 0)
-  const output: GuidePoint[] = []
+  const output: T[] = []
   let segment = 0
   let walked = 0
-  for (let index = 0; index < SAMPLE_COUNT; index += 1) {
-    const target = total * index / SAMPLE_COUNT
-    while (walked + lengths[segment] < target) {
+  for (let index = 0; index < count; index += 1) {
+    const target = total * index / count
+    while (segment < points.length - 1 && walked + lengths[segment] < target) {
       walked += lengths[segment]
-      segment = (segment + 1) % points.length
+      segment += 1
     }
     const next = points[(segment + 1) % points.length]
     const amount = (target - walked) / Math.max(lengths[segment], 1e-9)
-    output.push({
-      x: points[segment].x + (next.x - points[segment].x) * amount,
-      y: points[segment].y + (next.y - points[segment].y) * amount,
-    })
+    output.push(interpolate(points[segment], next, amount))
   }
   return output
+}
+
+const interpolatePoint = (current: GuidePoint, next: GuidePoint, amount: number) => ({
+  x: current.x + (next.x - current.x) * amount,
+  y: current.y + (next.y - current.y) * amount,
+})
+
+function resampleTrack(points: TrackPoint[]) {
+  return resampleClosed(points, SAMPLE_COUNT, (current, next, amount) => ({
+    ...interpolatePoint(current, next, amount),
+    rightWidth: current.rightWidth + (next.rightWidth - current.rightWidth) * amount,
+    leftWidth: current.leftWidth + (next.leftWidth - current.leftWidth) * amount,
+  }))
+}
+
+function resampleRacingLine(points: GuidePoint[]) {
+  return resampleClosed(points, SAMPLE_COUNT, interpolatePoint)
+}
+
+function boundaryPoints(centerline: TrackPoint[]) {
+  const left: GuidePoint[] = []
+  const right: GuidePoint[] = []
+  for (let index = 0; index < centerline.length; index += 1) {
+    const before = centerline[wrap(index - 1, centerline.length)]
+    const after = centerline[(index + 1) % centerline.length]
+    const length = distance(before, after) || 1
+    const normalX = -(after.y - before.y) / length
+    const normalY = (after.x - before.x) / length
+    const point = centerline[index]
+    left.push({ x: point.x + normalX * point.leftWidth, y: point.y + normalY * point.leftWidth })
+    right.push({ x: point.x - normalX * point.rightWidth, y: point.y - normalY * point.rightWidth })
+  }
+  return { left, right }
+}
+
+function fitToMap(centerline: TrackPoint[], left: GuidePoint[], right: GuidePoint[], racingLine: GuidePoint[]) {
+  const points = [...left, ...right, ...racingLine]
+  const minX = Math.min(...points.map((point) => point.x))
+  const maxX = Math.max(...points.map((point) => point.x))
+  const minY = Math.min(...points.map((point) => point.y))
+  const maxY = Math.max(...points.map((point) => point.y))
+  const scale = 920 / Math.max(maxX - minX, maxY - minY, 1)
+  const offsetX = (1000 - (maxX - minX) * scale) / 2
+  const offsetY = (1000 - (maxY - minY) * scale) / 2
+  const fit = (point: GuidePoint): GuidePoint => ({
+    x: offsetX + (point.x - minX) * scale,
+    y: 1000 - offsetY - (point.y - minY) * scale,
+  })
+  return {
+    centerline: centerline.map(fit),
+    leftEdge: left.map(fit),
+    rightEdge: right.map(fit),
+    racingLine: racingLine.map(fit),
+  }
 }
 
 function localTurns(points: GuidePoint[]): number[] {
@@ -85,7 +158,7 @@ function localTurns(points: GuidePoint[]): number[] {
   })
 }
 
-function findCorners(turns: number[]) {
+function findCorners(turns: number[], sampleSpacing: number) {
   const groups: { start: number; end: number; sum: number; sign: number; apex: number; peak: number }[] = []
   let active: typeof groups[number] | null = null
   for (let index = 0; index < turns.length; index += 1) {
@@ -103,71 +176,73 @@ function findCorners(turns: number[]) {
     }
   }
   if (active) groups.push(active)
+
+  if (groups.length > 1) {
+    const first = groups[0]
+    const last = groups[groups.length - 1]
+    if (first.sign === last.sign && first.start + turns.length - last.end <= MERGE_GAP) {
+      const wrapped = {
+        start: last.start,
+        end: first.end + turns.length,
+        sum: first.sum + last.sum,
+        sign: first.sign,
+        apex: first.peak > last.peak ? first.apex : last.apex,
+        peak: Math.max(first.peak, last.peak),
+      }
+      groups.splice(groups.length - 1, 1)
+      groups.splice(0, 1, wrapped)
+    }
+  }
+
   return groups
     .filter((corner) => Math.abs(corner.sum) >= CORNER_THRESHOLD)
     .map((corner) => ({
       ...corner,
-      character: Math.abs(corner.sum) >= 2.4 ? 'tight' as const : Math.abs(corner.sum) >= 1.1 ? 'medium' as const : 'flowing' as const,
+      character: sampleSpacing / corner.peak <= 45 ? 'tight' as const
+        : sampleSpacing / corner.peak <= 110 ? 'medium' as const : 'flowing' as const,
     }))
 }
 
-function tangent(points: GuidePoint[], index: number) {
-  const before = points[wrap(index - INDEX_WINDOW, points.length)]
-  const after = points[(index + INDEX_WINDOW) % points.length]
-  const length = distance(before, after) || 1
-  return { x: (after.x - before.x) / length, y: (after.y - before.y) / length }
+function pointAt(points: GuidePoint[], index: number): GuidePoint {
+  return points[wrap(index, points.length)]
 }
 
-function pointAt(points: GuidePoint[], index: number, offset = 0): GuidePoint {
-  const at = wrap(index, points.length)
-  const direction = tangent(points, at)
-  return {
-    x: points[at].x - direction.y * offset,
-    y: points[at].y + direction.x * offset,
-  }
+function sliceClosed(points: GuidePoint[], start: number, end: number) {
+  const result: GuidePoint[] = []
+  for (let index = start; index <= end; index += 1) result.push(pointAt(points, index))
+  return result
 }
 
 function guideFor(track: GuideTrack): TrackGuide {
-  const outline = resampleClosed(routeFromSvg(SOURCES[track]))
-  const corners = findCorners(localTurns(outline))
-  const guides: GuideCorner[] = corners.map((corner, index) => {
-    const entry = wrap(corner.start - 8, outline.length)
-    const turnIn = wrap(corner.start - 3, outline.length)
-    const exit = wrap(corner.end + 8, outline.length)
-    const entryOffset = -corner.sign * TRACK_OFFSET
-    const apexOffset = corner.sign * TRACK_OFFSET
-    const line: GuidePoint[] = []
-    let length = wrap(exit - entry, outline.length)
-    if (length === 0) length = outline.length
-    const apexDistance = wrap(corner.apex - entry, outline.length)
-    for (let step = 0; step <= length; step += 1) {
-      const approachProgress = Math.min(1, step / Math.max(1, apexDistance))
-      const exitProgress = step <= apexDistance ? 0 : (step - apexDistance) / Math.max(1, length - apexDistance)
-      const smooth = (value: number) => value * value * (3 - 2 * value)
-      const offset = step <= apexDistance
-        ? entryOffset + (apexOffset - entryOffset) * smooth(approachProgress)
-        : apexOffset + (entryOffset - apexOffset) * smooth(exitProgress)
-      line.push(pointAt(outline, entry + step, offset))
-    }
+  const source = SOURCES[track]
+  const rawCenterline = parseTrack(source.track)
+  const rawRacingLine = parseRacingLine(source.line)
+  const lengthMeters = pathLength(rawCenterline)
+  const centerline = resampleTrack(rawCenterline)
+  const racingLine = resampleRacingLine(rawRacingLine)
+  const bounds = boundaryPoints(centerline)
+  const fitted = fitToMap(centerline, bounds.left, bounds.right, racingLine)
+  const sampleSpacing = pathLength(racingLine) / SAMPLE_COUNT
+  const groups = findCorners(localTurns(racingLine), sampleSpacing)
+  const corners: GuideCorner[] = groups.map((corner, index) => {
+    const entry = corner.start - MARKER_APPROACH
+    const turnIn = corner.start - MARKER_TURN_IN
+    const exit = corner.end + MARKER_APPROACH
     return {
       number: index + 1,
-      direction: corner.sign > 0 ? 'right' : 'left',
+      direction: corner.sign > 0 ? 'left' : 'right',
       character: corner.character,
       points: {
-        approach: pointAt(outline, entry),
-        turnIn: pointAt(outline, turnIn),
-        apex: pointAt(outline, corner.apex, apexOffset),
-        exit: pointAt(outline, exit),
+        approach: pointAt(fitted.racingLine, entry),
+        turnIn: pointAt(fitted.racingLine, turnIn),
+        apex: pointAt(fitted.racingLine, corner.apex),
+        exit: pointAt(fitted.racingLine, exit),
       },
-      line,
+      line: sliceClosed(fitted.racingLine, entry, exit),
     }
   })
 
-  return {
-    track,
-    outline,
-    corners: guides,
-  }
+  return { track, lengthMeters, ...fitted, corners }
 }
 
 const CACHE = new Map<GuideTrack, TrackGuide>()

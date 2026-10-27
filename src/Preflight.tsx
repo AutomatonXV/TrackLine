@@ -50,14 +50,16 @@ export default function Preflight() {
 
     <div className="preflight-layout">
       <div className="preflight-map-card">
-        <div className="preflight-map-title"><span>{track}</span><small>{guide.corners.length} geometry-derived turns · Start/finish at red marker</small></div>
+        <div className="preflight-map-title"><span>{track}</span><small>{guide.corners.length} turns · {guide.lengthMeters.toFixed(0)} m sourced layout</small></div>
         <svg className="preflight-map" viewBox="0 0 1000 1000" role="img" aria-label={`${track} turn-by-turn map`}>
-          <polyline points={pointString([...guide.outline, guide.outline[0]])} className="preflight-road" />
-          <polyline points={pointString([...guide.outline, guide.outline[0]])} className="preflight-center" />
+          <polygon points={pointString([...guide.leftEdge, ...guide.rightEdge.slice().reverse()])} className="preflight-road" />
+          <polyline points={pointString([...guide.leftEdge, guide.leftEdge[0]])} className="preflight-boundary" />
+          <polyline points={pointString([...guide.rightEdge, guide.rightEdge[0]])} className="preflight-boundary" />
+          <polyline points={pointString([...guide.centerline, guide.centerline[0]])} className="preflight-center" />
+          <polyline points={pointString([...guide.racingLine, guide.racingLine[0]])} className="preflight-racing-line" />
           {guide.corners.map((corner, index) => <polyline key={`line-${corner.number}`}
             points={pointString(corner.line)}
-            className={`preflight-racing-line${index === selected ? ' active' : ''}`} />)}
-          <circle cx={guide.outline[0].x} cy={guide.outline[0].y} r="9" className="preflight-start" />
+            className={`preflight-racing-line-active${index === selected ? ' active' : ''}`} />)}
           {guide.corners.map((corner, index) => <g key={corner.number} className={`preflight-corner${index === selected ? ' active' : ''}`}
             onClick={() => setSelected(index)} role="button" aria-label={`Select corner ${corner.number}`}>
             <circle cx={corner.points.apex.x} cy={corner.points.apex.y} r={index === selected ? 18 : 14} className="preflight-corner-hit" />
@@ -74,7 +76,7 @@ export default function Preflight() {
           <span><i className="legend-apex">A</i> Approximate apex</span>
           <span><i className="legend-exit">E</i> Track-out</span>
         </div>
-        <p className="preflight-caveat">The green path illustrates a geometry-based outside–inside–outside line. Markers are estimates from the bundled map—not surveyed racing lines, braking distances, or roadside board locations. Check sight lines and conditions in ACC.</p>
+        <p className="preflight-caveat">The green route is TUMFTM’s minimum-curvature optimized reference line, not an ACC car-specific setup. Corner grouping and approach, turn-in, apex, and exit markers are estimated from that route—not braking distances or roadside boards. Source quality varies by venue; verify the layout and conditions in ACC.</p>
       </div>
 
       <aside className="preflight-guide">

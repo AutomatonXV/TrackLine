@@ -11,11 +11,34 @@ test('generates finite corner and racing-line guidance for every bundled circuit
   })
   try {
     const { getTrackGuide, GUIDE_TRACKS } = await server.ssrLoadModule('/src/trackGuide.ts')
+    const expectedLength = {
+      Monza: [5700, 5900],
+      'Spa-Francorchamps': [6900, 7100],
+      'Nürburgring GP': [5000, 5300],
+    }
+    const expectedCorners = {
+      Monza: [10, 13],
+      'Spa-Francorchamps': [12, 18],
+      'Nürburgring GP': [12, 18],
+    }
     for (const track of GUIDE_TRACKS) {
       const guide = getTrackGuide(track)
       assert.equal(guide.track, track)
-      assert.equal(guide.outline.length, 360)
-      assert.ok(guide.corners.length >= 8 && guide.corners.length <= 25, `${track}: ${guide.corners.length} turns`)
+      assert.equal(guide.centerline.length, 1200)
+      assert.equal(guide.racingLine.length, 1200)
+      assert.ok(guide.lengthMeters >= expectedLength[track][0] && guide.lengthMeters <= expectedLength[track][1], `${track}: ${guide.lengthMeters} m`)
+      assert.ok(guide.corners.length >= expectedCorners[track][0] && guide.corners.length <= expectedCorners[track][1], `${track}: ${guide.corners.length} turns`)
+      for (const edge of [guide.leftEdge, guide.rightEdge]) {
+        assert.equal(edge.length, guide.centerline.length)
+        for (const point of edge) {
+          assert.ok(Number.isFinite(point.x) && Number.isFinite(point.y))
+          assert.ok(point.x >= 0 && point.x <= 1000 && point.y >= 0 && point.y <= 1000)
+        }
+      }
+      for (const point of guide.racingLine) {
+        assert.ok(Number.isFinite(point.x) && Number.isFinite(point.y))
+        assert.ok(point.x >= 0 && point.x <= 1000 && point.y >= 0 && point.y <= 1000)
+      }
       for (const corner of guide.corners) {
         assert.ok(['left', 'right'].includes(corner.direction))
         assert.ok(['tight', 'medium', 'flowing'].includes(corner.character))

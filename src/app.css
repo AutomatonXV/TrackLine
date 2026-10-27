@@ -97,11 +97,12 @@
 .preflight-map-title span { font-size: 12px; font-weight: 700; }
 .preflight-map-title small { color: var(--muted); font-size: 9px; }
 .preflight-map { display: block; width: min(100%, calc(100vh - 260px)); height: min(100%, calc(100vh - 270px)); min-height: 220px; overflow: visible; }
-.preflight-road { fill: none; stroke: #3a4544; stroke-width: 28; stroke-linecap: round; stroke-linejoin: round; }
+.preflight-road { fill: #3a4544; stroke: none; }
+.preflight-boundary { fill: none; stroke: #75827d; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .preflight-center { fill: none; stroke: #75827d; stroke-width: 2; stroke-dasharray: 4 5; stroke-linecap: round; stroke-linejoin: round; }
-.preflight-racing-line { fill: none; stroke: #a9e36e; stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; opacity: .46; pointer-events: none; }
-.preflight-racing-line.active { stroke: #e1ffae; stroke-width: 9; opacity: .95; }
-.preflight-start { fill: #ef4e50; stroke: #101314; stroke-width: 4; }
+.preflight-racing-line, .preflight-racing-line-active { fill: none; stroke: #a9e36e; stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; opacity: .72; pointer-events: none; }
+.preflight-racing-line-active { stroke: #e1ffae; stroke-width: 9; opacity: 0; }
+.preflight-racing-line-active.active { opacity: .98; }
 .preflight-corner { cursor: pointer; }
 .preflight-corner-hit { fill: #101314; fill-opacity: .92; stroke: #9daaa4; stroke-width: 2; }
 .preflight-corner text { fill: #e9ece8; font: 700 11px var(--mono); pointer-events: none; }

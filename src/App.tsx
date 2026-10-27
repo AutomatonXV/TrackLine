@@ -1,12 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, DragEvent, PointerEvent as ReactPointerEvent } from 'react'
 import { Activity, ChevronLeft, ChevronRight, Crosshair, FileUp, Map, Navigation, Minus, Pause, Play, Plus, TriangleAlert, X } from 'lucide-react'
 import { fitToTrack, hasTrackModel } from './trackMap'
 import { sectorMarkers } from './data/sectors'
 import LivePanel from './LivePanel'
-import Preflight from './Preflight'
 import { indexAtTime, useLiveRun } from './useLiveRun'
 import './app.css'
+
+const Preflight = lazy(() => import('./Preflight'))
 
 const N = 480
 const SLOW = '#ff3b30'
@@ -646,7 +647,7 @@ export default function App() {
     </header>
 
     <section className="stage" style={{ '--pane': `${pane}px`, '--chart-h': `${Math.round(pane * 0.28)}px` } as CSSProperties}>
-      {preflight ? <Preflight /> : <>
+      {preflight ? <Suspense fallback={<div className="preflight-empty" aria-live="polite">Loading sourced track geometry…</div>}><Preflight /></Suspense> : <>
       <svg ref={svgRef} className="map" viewBox="0 0 1000 1000" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={() => { drag.current = null }}
         onWheel={(event) => setZoom((value) => Math.max(0.6, Math.min(20, value * (event.deltaY < 0 ? 1.12 : 0.89))))}>
         <g ref={groupRef} transform={`translate(${view.x} ${view.y}) translate(500 500) scale(${zoom}) translate(-500 -500)`}>
