@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, DragEvent, PointerEvent as ReactPointerEvent } from 'react'
-import { Activity, ChevronLeft, ChevronRight, Crosshair, FileUp, Navigation, Minus, Pause, Play, Plus, TriangleAlert, X } from 'lucide-react'
+import { Activity, ChevronLeft, ChevronRight, Crosshair, FileUp, Map, Navigation, Minus, Pause, Play, Plus, TriangleAlert, X } from 'lucide-react'
 import { fitToTrack, hasTrackModel } from './trackMap'
 import { sectorMarkers } from './data/sectors'
 import LivePanel from './LivePanel'
+import Preflight from './Preflight'
 import { indexAtTime, useLiveRun } from './useLiveRun'
 import './app.css'
 
@@ -287,6 +288,7 @@ function SlotCard({ label, swatch, slot, onPick, onClear, onLap, onDropFiles }: 
 }
 
 export default function App() {
+  const [preflight, setPreflight] = useState(false)
   const [slots, setSlots] = useState<Record<SlotKey, Slot | null>>({ ref: null, mine: null })
   const [notice, setNotice] = useState<{ title: string; body: string } | null>(null)
   const [picks, setPicks] = useState<number[]>([])
@@ -638,11 +640,13 @@ export default function App() {
       <SlotCard label="MY LAP" swatch={mineColor} slot={slots.mine} onPick={() => void pickSlot('mine')} onClear={() => clearSlot('mine')} onLap={(index) => changeLap('mine', index)} onDropFiles={(files) => void dropOnSlot('mine', files)} />
       <SlotCard label="REFERENCE" swatch="#ffffff" slot={slots.ref} onPick={() => void pickSlot('ref')} onClear={() => clearSlot('ref')} onLap={(index) => changeLap('ref', index)} onDropFiles={(files) => void dropOnSlot('ref', files)} />
       {slots.mine && !slots.ref && <button className="use-fastest" onClick={() => void useFastestAsReference()}>Use my fastest as reference</button>}
+      <button className={`preflight-toggle${preflight ? ' active' : ''}`} onClick={() => setPreflight((value) => !value)}><Map size={14} /> {preflight ? 'LAP ANALYSIS' : 'PRE-FLIGHT'}</button>
       <div className="session">{tracksLabel ? <><b>{tracksLabel.track}</b><span>{tracksLabel.car}</span></> : <span>No laps open</span>}</div>
       <LivePanel />
     </header>
 
     <section className="stage" style={{ '--pane': `${pane}px`, '--chart-h': `${Math.round(pane * 0.28)}px` } as CSSProperties}>
+      {preflight ? <Preflight /> : <>
       <svg ref={svgRef} className="map" viewBox="0 0 1000 1000" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={() => { drag.current = null }}
         onWheel={(event) => setZoom((value) => Math.max(0.6, Math.min(20, value * (event.deltaY < 0 ? 1.12 : 0.89))))}>
         <g ref={groupRef} transform={`translate(${view.x} ${view.y}) translate(500 500) scale(${zoom}) translate(-500 -500)`}>
@@ -764,6 +768,7 @@ export default function App() {
         <Chart title="THROTTLE" field="throttle" refPoints={refPoints} minePoints={minePoints} from={range.a} to={range.b} mineColor={mineColor} refFrac={refFrac} mineFrac={mineFrac} onScrub={seekIndex} />
         <Chart title="BRAKE" field="brake" refPoints={refPoints} minePoints={minePoints} from={range.a} to={range.b} mineColor={mineColor} refFrac={refFrac} mineFrac={mineFrac} onScrub={seekIndex} />
       </aside>
+      </>}
     </section>
   </main>
 }
