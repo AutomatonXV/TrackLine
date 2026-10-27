@@ -12,6 +12,17 @@ contextBridge.exposeInMainWorld('fastrack', {
   savePreferences: (preferences) => ipcRenderer.invoke('preferences:save', preferences),
   getBestSectors: () => ipcRenderer.invoke('sectors:get'),
   saveBestSectors: (entry) => ipcRenderer.invoke('sectors:save', entry),
+  getSetup: () => ipcRenderer.invoke('setup:get'),
+  importSetup: () => ipcRenderer.invoke('setup:import'),
+  clearSetup: () => ipcRenderer.invoke('setup:clear'),
+  getPendingSetupFeedback: () => ipcRenderer.invoke('setup:pending-feedback'),
+  submitSetupFeedback: (sessionId, issue) => ipcRenderer.invoke('setup:submit-feedback', { sessionId, issue }),
+  dismissSetupFeedback: (sessionId) => ipcRenderer.invoke('setup:dismiss-feedback', sessionId),
+  onSetupFeedback: (callback) => {
+    const handler = (_event, feedback) => callback(feedback)
+    ipcRenderer.on('setup:feedback', handler)
+    return () => ipcRenderer.removeListener('setup:feedback', handler)
+  },
   liveStatus: () => ipcRenderer.invoke('live:status'),
   reconnectAcc: () => ipcRenderer.invoke('live:reconnect'),
   saveLiveSettings: (patch) => ipcRenderer.invoke('live:settings', patch),

@@ -10,13 +10,15 @@ const referencePath = path.join(__dirname, '../Assets/Reference_Monza_720SEVO_Mo
 
 function writeWide(buffer, offset, text) { buffer.write(`${text}\0`, offset, 'utf16le') }
 
-function physicsBuffer({ packetId = 1, gas = 0, brake = 0, steer = 0, speed = 0 } = {}) {
+function physicsBuffer({ packetId = 1, gas = 0, brake = 0, steer = 0, speed = 0, pressures = [25, 26, 27, 28], temps = [70, 71, 72, 73] } = {}) {
   const buffer = Buffer.alloc(800)
   buffer.writeInt32LE(packetId, 0)
   buffer.writeFloatLE(gas, 4)
   buffer.writeFloatLE(brake, 8)
   buffer.writeFloatLE(steer, 24)
   buffer.writeFloatLE(speed, 28)
+  pressures.forEach((value, index) => buffer.writeFloatLE(value, 88 + index * 4))
+  temps.forEach((value, index) => buffer.writeFloatLE(value, 152 + index * 4))
   return buffer
 }
 
@@ -44,6 +46,8 @@ test('parses ACC shared memory pages', () => {
   assert.equal(physics.gas, 0.75)
   assert.equal(physics.brake, 0.25)
   assert.ok(Math.abs(physics.steerAngle + 0.3) < 1e-6)
+  assert.deepEqual(physics.tyrePressuresPsi, [25, 26, 27, 28])
+  assert.deepEqual(physics.tyreCoreTempsC, [70, 71, 72, 73])
   const graphics = parseGraphics(graphicsBuffer({ position: 0.5, x: 12.5, z: -4 }))
   assert.equal(graphics.status, 'live')
   assert.equal(graphics.normalizedCarPosition, 0.5)

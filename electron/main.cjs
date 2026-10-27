@@ -4,6 +4,7 @@ const fs = require('node:fs')
 const path = require('node:path')
 const { discoverFiles, parseLap } = require('./telemetry.cjs')
 const { createLive } = require('./live.cjs')
+const { parseSetup, findSetupTemplate, createSetupVariant } = require('./setup.cjs')
 
 let live = null
 
@@ -11,8 +12,8 @@ let mainWindow
 const statePath = () => path.join(app.getPath('userData'), 'fastrack-data.json')
 
 function readState() {
-  try { return { bestSectors: {}, importedPaths: [], ...JSON.parse(fs.readFileSync(statePath(), 'utf8')) } }
-  catch { return { overrides: {}, bestSectors: {}, importedPaths: [] } }
+  try { return { bestSectors: {}, importedPaths: [], setupFeedbackQueue: [], ...JSON.parse(fs.readFileSync(statePath(), 'utf8')) } }
+  catch { return { overrides: {}, bestSectors: {}, importedPaths: [], setupFeedbackQueue: [] } }
 }
 
 function writeState(state) {
@@ -28,6 +29,11 @@ function dialogFolder() {
   const acc = path.join(app.getPath('documents'), 'Assetto Corsa Competizione')
   const motec = defaultMotecFolder()
   return fs.existsSync(motec) ? motec : fs.existsSync(acc) ? acc : app.getPath('documents')
+}
+
+function setupFolder() {
+  const folder = path.join(app.getPath('documents'), 'Assetto Corsa Competizione', 'Setups')
+  return fs.existsSync(folder) ? folder : app.getPath('documents')
 }
 
 function defaultReferencePath() {
@@ -93,6 +99,61 @@ app.whenReady().then(() => {
   ipcMain.handle('laps:load', (_event, filePath, lapIndex) => {
     if (typeof filePath !== 'string' || path.extname(filePath).toLowerCase() !== '.ld') throw new Error('Only MoTeC .ld files can be loaded.')
     return parseLap(filePath, lapIndex)
+  })
+  ipcMain.handle('setup:get', () => {
+    const setupPath = readState().setupPath
+    if (!setupPath) return { setup: null, error: '' }
+    try { return { setup: parseSetup(setupPath), error: '' } }
+    catch (error) { return { setup: null, error: error.message } }
+  })
+  ipcMain.handle('setup:import', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: 'Import ACC setup',
+      defaultPath: setupFolder(),
+      properties: ['openFile'],
+      filters: [{ name: 'ACC setup files', extensions: ['json'] }],
+    })
+    if (result.canceled || !result.filePaths[0]) return null
+    const setup = parseSetup(result.filePaths[0])
+    const state = readState()
+    state.setupPath = result.filePaths[0]
+    writeState(state)
+    return setup
+  })
+  ipcMain.handle('setup:clear', () => {
+    const state = readState()
+    delete state.setupPath
+    writeState(state)
+  })
+  ipcMain.handle('setup:pending-feedback', () => readState().setupFeedbackQueue[0] || null)
+  ipcMain.handle('setup:submit-feedback', (_event, { sessionId, issue }) => {
+    const state = readState()
+    const feedback = state.setupFeedbackQueue.find((entry) => entry.id === sessionId)
+    if (!feedback) throw new Error('This session feedback has already been completed.')
+    const setupsRoot = setupFolder()
+    const sourcePath = findSetupTemplate({
+      setupsRoot,
+      car: feedback.car,
+      track: feedback.track,
+      preferredPath: state.setupPath,
+    })
+    if (!sourcePath) throw new Error(`No ACC setup was found for ${feedback.car}. Import a setup for this car, then try again.`)
+    const result = createSetupVariant({
+      sourcePath,
+      setupsRoot,
+      car: feedback.car,
+      track: feedback.track,
+      issue,
+    })
+    state.setupPath = result.setup.path
+    state.setupFeedbackQueue = state.setupFeedbackQueue.filter((entry) => entry.id !== sessionId)
+    writeState(state)
+    return result
+  })
+  ipcMain.handle('setup:dismiss-feedback', (_event, sessionId) => {
+    const state = readState()
+    state.setupFeedbackQueue = state.setupFeedbackQueue.filter((entry) => entry.id !== sessionId)
+    writeState(state)
   })
   ipcMain.handle('preferences:get', () => {
     const state = readState()

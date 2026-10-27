@@ -1,16 +1,18 @@
 const { AccReader } = require('./acc.cjs')
 const { Coach } = require('./coach.cjs')
 const { pickFastest, buildTable } = require('./reference.cjs')
+const { SessionRecorder } = require('./session-recorder.cjs')
 
 const HUD_ASPECT = 1
 const HUD_SIZE = 300
-const DEFAULT_SETTINGS = { hudEnabled: true, hudMode: 'overlay', swapLR: false, leadSeconds: 0.25, voiceEnabled: true, voiceVolume: 0.8, cooldownSeconds: 1.5 }
+const DEFAULT_SETTINGS = { hudEnabled: true, hudMode: 'overlay', coachMarkers: true, swapLR: false, leadSeconds: 0.25, voiceEnabled: true, voiceVolume: 0.8, cooldownSeconds: 1.5 }
 const SEND_INTERVAL_MS = 30
 
 function createLive({ electron, readState, writeState, library, parseLap, preloadPath, loadRenderer, getMainWindow }) {
   const { BrowserWindow, globalShortcut, ipcMain, screen } = electron
   const reader = new AccReader()
   const coach = new Coach()
+  const sessionRecorder = new SessionRecorder()
   let hud = null
   let editMode = false
   let saveTimer = null
@@ -37,7 +39,7 @@ function createLive({ electron, readState, writeState, library, parseLap, preloa
       referenceError,
       accError,
       calibrated: Boolean(coach.cal && coach.cal.rms <= 40),
-      settings: { hudEnabled: current.hudEnabled, hudMode: current.hudMode, swapLR: current.swapLR, leadSeconds: current.leadSeconds, voiceEnabled: current.voiceEnabled, voiceVolume: current.voiceVolume, cooldownSeconds: current.cooldownSeconds, hudSize: hud && !hud.isDestroyed() ? hud.getBounds().width : (current.hudBounds?.width ?? HUD_SIZE) },
+      settings: { hudEnabled: current.hudEnabled, hudMode: current.hudMode, coachMarkers: current.coachMarkers, swapLR: current.swapLR, leadSeconds: current.leadSeconds, voiceEnabled: current.voiceEnabled, voiceVolume: current.voiceVolume, cooldownSeconds: current.cooldownSeconds, hudSize: hud && !hud.isDestroyed() ? hud.getBounds().width : (current.hudBounds?.width ?? HUD_SIZE) },
       hud: { visible: Boolean(hud && !hud.isDestroyed() && hud.isVisible()), edit: editMode },
     }
   }
@@ -47,6 +49,17 @@ function createLive({ electron, readState, writeState, library, parseLap, preloa
   }
 
   const sendStatus = () => broadcast('live:status', status())
+
+  function saveFeedback(feedback) {
+    if (!feedback) return
+    const state = readState()
+    state.setupFeedbackQueue = [...(state.setupFeedbackQueue || []), feedback]
+    writeState(state)
+    const win = getMainWindow()
+    if (win && !win.isDestroyed()) win.webContents.send('setup:feedback', feedback)
+  }
+
+  function finishSession(now = Date.now()) { saveFeedback(sessionRecorder.finish(now)) }
 
   function selectReference(frame) {
     context = { car: frame.carModel, track: frame.track }
@@ -77,11 +90,13 @@ function createLive({ electron, readState, writeState, library, parseLap, preloa
 
   reader.on('error', (error) => { accError = error.message })
   reader.on('connection', (connected) => {
-    if (!connected) { context = { car: '', track: '' }; reference = null; referenceError = ''; coach.setReference(null) }
+    if (!connected) { finishSession(); context = { car: '', track: '' }; reference = null; referenceError = ''; coach.setReference(null) }
     syncHud()
     sendStatus()
   })
   reader.on('frame', (frame) => {
+    if (frame.status === 'live') saveFeedback(sessionRecorder.update(frame, frame.t))
+    else if (frame.status !== 'pause') finishSession(frame.t)
     if (frame.carModel !== context.car || frame.track !== context.track) {
       selectReference(frame)
       syncHud()
@@ -91,7 +106,11 @@ function createLive({ electron, readState, writeState, library, parseLap, preloa
     const output = coach.update(frame, now)
     if (!output.cue && now - lastSent < SEND_INTERVAL_MS) return
     lastSent = now
-    broadcast('live:frame', { ...output, t: now })
+    broadcast('live:frame', {
+      ...output,
+      tyres: { pressuresPsi: frame.tyrePressuresPsi, coreTempsC: frame.tyreCoreTempsC },
+      t: now,
+    })
   })
 
   function defaultBounds() {
@@ -168,6 +187,7 @@ function createLive({ electron, readState, writeState, library, parseLap, preloa
     const next = {}
     if (typeof patch.hudEnabled === 'boolean') next.hudEnabled = patch.hudEnabled
     if (patch.hudMode === 'overlay' || patch.hudMode === 'window') next.hudMode = patch.hudMode
+    if (typeof patch.coachMarkers === 'boolean') next.coachMarkers = patch.coachMarkers
     if (typeof patch.swapLR === 'boolean') next.swapLR = patch.swapLR
     if (Number.isFinite(patch.leadSeconds)) next.leadSeconds = Math.max(0.05, Math.min(1, patch.leadSeconds))
     if (typeof patch.voiceEnabled === 'boolean') next.voiceEnabled = patch.voiceEnabled
@@ -217,6 +237,7 @@ function createLive({ electron, readState, writeState, library, parseLap, preloa
 
   function stop() {
     globalShortcut.unregisterAll()
+    finishSession()
     reader.stop()
     clearTimeout(saveTimer)
   }

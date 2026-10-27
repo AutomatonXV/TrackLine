@@ -63,7 +63,33 @@ interface LiveFrame {
   lapMs?: number
   rpm?: number
   maxRpm?: number
+  tyres?: { pressuresPsi: number[]; coreTempsC: number[] }
   cue?: { id: string; clip: string; interrupt: boolean; text: string }
+}
+
+interface SetupSummary {
+  path: string
+  name: string
+  car: string
+  track: string
+  pressureValues: number[]
+}
+
+interface SetupFeedback {
+  id: string
+  car: string
+  track: string
+  durationSeconds: number
+  completedLaps: number
+  maxSpeedKmh: number
+  endedAt: number
+}
+
+interface SetupVariant {
+  setup: SetupSummary
+  issue: string
+  description: string
+  change: string
 }
 
 interface LiveStatus {
@@ -74,7 +100,7 @@ interface LiveStatus {
   referenceError: string
   accError: string
   calibrated: boolean
-  settings: { hudEnabled: boolean; hudMode: 'overlay' | 'window'; swapLR: boolean; leadSeconds: number; voiceEnabled: boolean; voiceVolume: number; cooldownSeconds: number; hudSize: number }
+  settings: { hudEnabled: boolean; hudMode: 'overlay' | 'window'; coachMarkers: boolean; swapLR: boolean; leadSeconds: number; voiceEnabled: boolean; voiceVolume: number; cooldownSeconds: number; hudSize: number }
   hud: { visible: boolean; edit: boolean }
 }
 
@@ -98,5 +124,12 @@ interface Window {
     savePreferences: (preferences: Preferences) => Promise<Preferences>
     getBestSectors: () => Promise<Record<string, number[]>>
     saveBestSectors: (entry: { track: string; car: string; sectors: number[] }) => Promise<Record<string, number[]>>
+    getSetup: () => Promise<{ setup: SetupSummary | null; error: string }>
+    importSetup: () => Promise<SetupSummary | null>
+    clearSetup: () => Promise<void>
+    getPendingSetupFeedback: () => Promise<SetupFeedback | null>
+    submitSetupFeedback: (sessionId: string, issue: 'frontPush' | 'rearLoose' | 'brakingStability' | 'balanced') => Promise<SetupVariant>
+    dismissSetupFeedback: (sessionId: string) => Promise<void>
+    onSetupFeedback: (callback: (feedback: SetupFeedback) => void) => () => void
   }
 }

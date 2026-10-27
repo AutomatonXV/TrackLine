@@ -64,20 +64,20 @@ function useLive() {
   return { frame, status }
 }
 
-function PedalArc({ side, reading, color }: { side: Side; reading: PedalReading; color: string }) {
+function PedalArc({ side, reading, color, showReference }: { side: Side; reading: PedalReading; color: string; showReference: boolean }) {
   const you = Math.max(0, Math.min(1, reading.you / 100))
   const ref = Math.max(0, Math.min(1, reading.ref / 100))
   const gap = Math.abs(reading.you - reading.ref)
   const off = gap > OFF_LIMIT
-  color = blend(color, gap)
+  if (showReference) color = blend(color, gap)
   const tickInner = point(side, ref, RING - 15)
   const tickOuter = point(side, ref, RING + 11)
   const knob = point(side, you, RING)
   return <g>
     <path d={arc(side, 1, RING)} className="hud-arc-bg" />
-    <path d={arc(side, ref, GHOST)} className="hud-arc-ghost" />
+    {showReference && <path d={arc(side, ref, GHOST)} className="hud-arc-ghost" />}
     <path d={arc(side, you, RING)} className="hud-arc-fill" style={{ stroke: color }} />
-    <line x1={tickInner.x} y1={tickInner.y} x2={tickOuter.x} y2={tickOuter.y} className={`hud-ideal${off ? ' off' : ''}`} />
+    {showReference && <line x1={tickInner.x} y1={tickInner.y} x2={tickOuter.x} y2={tickOuter.y} className={`hud-ideal${off ? ' off' : ''}`} />}
     {you > 0.01 && <circle cx={knob.x} cy={knob.y} r="9" className="hud-knob" style={{ fill: color }} />}
   </g>
 }
@@ -138,6 +138,7 @@ export default function Hud() {
   const grip = useRef<{ x: number; width: number } | null>(null)
   const edit = Boolean(status?.hud.edit)
   const windowed = status?.settings.hudMode === 'window'
+  const showReference = status?.settings.coachMarkers !== false
 
   useEffect(() => {
     document.documentElement.classList.add('hud-page')
@@ -168,10 +169,12 @@ export default function Hud() {
       <circle cx={C} cy={C} r="150" className="hud-disk" />
       {shown ? <>
         <text x={C} y={C + 48} textAnchor="middle" className="hud-gear">{gearLabel(shown.gear ?? 1)}</text>
-        <PedalArc side="left" reading={brake} color="#ff3b30" />
-        <PedalArc side="right" reading={throttle} color="#34c759" />
-        <WarnArc side="left" warn={brakeWarn} color={blend('#ff3b30', Math.abs(brake.you - brake.ref))} />
-        <WarnArc side="right" warn={throttleWarn} color={blend('#34c759', Math.abs(throttle.you - throttle.ref))} />
+        <PedalArc side="left" reading={brake} color="#ff3b30" showReference={showReference} />
+        <PedalArc side="right" reading={throttle} color="#34c759" showReference={showReference} />
+        {showReference && <>
+          <WarnArc side="left" warn={brakeWarn} color={blend('#ff3b30', Math.abs(brake.you - brake.ref))} />
+          <WarnArc side="right" warn={throttleWarn} color={blend('#34c759', Math.abs(throttle.you - throttle.ref))} />
+        </>}
         <RpmArc rpm={shown.rpm ?? 0} maxRpm={shown.maxRpm ?? 0} />
         <g textAnchor="middle">
           <text x={C} y={226} className="hud-speed">{Math.round(shown.speedKmh ?? 0)}</text>

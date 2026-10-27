@@ -22,6 +22,8 @@ function parsePhysics(buffer) {
     rpm: buffer.readInt32LE(20),
     steerAngle: buffer.readFloatLE(24),
     speedKmh: buffer.readFloatLE(28),
+    tyrePressuresPsi: Array.from({ length: 4 }, (_, index) => buffer.readFloatLE(88 + index * 4)),
+    tyreCoreTempsC: Array.from({ length: 4 }, (_, index) => buffer.readFloatLE(152 + index * 4)),
   }
 }
 
