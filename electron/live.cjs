@@ -108,6 +108,7 @@ function createLive({ electron, readState, writeState, library, parseLap, preloa
     lastSent = now
     broadcast('live:frame', {
       ...output,
+      fuelLiters: frame.fuelLiters,
       tyres: { pressuresPsi: frame.tyrePressuresPsi, coreTempsC: frame.tyreCoreTempsC },
       t: now,
     })

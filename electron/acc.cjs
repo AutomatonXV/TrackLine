@@ -18,6 +18,7 @@ function parsePhysics(buffer) {
     packetId: buffer.readInt32LE(0),
     gas: buffer.readFloatLE(4),
     brake: buffer.readFloatLE(8),
+    fuelLiters: buffer.readFloatLE(12),
     gear: buffer.readInt32LE(16),
     rpm: buffer.readInt32LE(20),
     steerAngle: buffer.readFloatLE(24),

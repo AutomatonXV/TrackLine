@@ -132,43 +132,43 @@ function blend(color: string, gap: number) {
   return `rgb(${from.map((value, index) => Math.round(value + (to[index] - value) * mix)).join(',')})`
 }
 
-export default function Hud() {
-  const { frame, status } = useLive()
-  const [scale, setScale] = useState(1)
-  const grip = useRef<{ x: number; width: number } | null>(null)
-  const edit = Boolean(status?.hud.edit)
-  const windowed = status?.settings.hudMode === 'window'
-  const showReference = status?.settings.coachMarkers !== false
+function tireColor(temperature: number) {
+  if (temperature < 60) return '#3fc8ff'
+  if (temperature < 100) return '#34c759'
+  if (temperature < 115) return '#ffd60a'
+  return '#ff3b30'
+}
 
-  useEffect(() => {
-    document.documentElement.classList.add('hud-page')
-    const resize = () => setScale(Math.min(window.innerWidth, window.innerHeight) / SIZE)
-    resize()
-    window.addEventListener('resize', resize)
-    return () => window.removeEventListener('resize', resize)
-  }, [])
+function TireTile({ label, x, y, pressure, temperature }: { label: string; x: number; y: number; pressure?: number; temperature?: number }) {
+  const color = temperature == null ? '#465052' : tireColor(temperature)
+  const barWidth = temperature == null ? 0 : Math.max(2, Math.min(42, (temperature - 40) / 80 * 42))
+  return <g>
+    <rect x={x} y={y} width="78" height="34" rx="5" className="hud-tire-tile" />
+    <text x={x + 7} y={y + 12} className="hud-tire-label">{label}</text>
+    <rect x={x + 30} y={y + 6} width="42" height="5" rx="2.5" className="hud-tire-temp-bg" />
+    <rect x={x + 30} y={y + 6} width={barWidth} height="5" rx="2.5" fill={color} />
+    <text x={x + 7} y={y + 26} className="hud-tire-pressure">{pressure == null ? '—' : pressure.toFixed(1)} PSI</text>
+    {temperature != null && <title>{label}: {temperature.toFixed(0)}°C core temperature</title>}
+  </g>
+}
 
-  const shown = frame?.state === 'active' ? frame : edit ? DEMO : null
+export function HudGauge({ frame, showReference = true }: { frame: LiveFrame | null; showReference?: boolean }) {
+  const shown = frame?.state === 'active' ? frame : null
   const message = frame?.state === 'noReference' ? 'No reference lap\nfor this car and track' : frame?.state === 'paused' ? 'Paused' : 'Waiting for ACC'
   const throttle = shown?.throttle ?? { you: 0, ref: 0 }
   const brake = shown?.brake ?? { you: 0, ref: 0 }
   const brakeWarn = useHeld(brake.warn)
   const throttleWarn = useHeld(throttle.warn)
+  const tyres = shown?.tyres
+  const fuel = shown?.fuelLiters
+  const fuelBlocks = fuel == null ? 0 : Math.min(10, Math.floor(fuel / 5))
 
-  function startResize(event: ReactPointerEvent<HTMLDivElement>) {
-    event.currentTarget.setPointerCapture(event.pointerId)
-    grip.current = { x: event.screenX, width: window.innerWidth }
-  }
-
-  function moveResize(event: ReactPointerEvent<HTMLDivElement>) {
-    if (grip.current) void window.fastrack.resizeHud(grip.current.width + event.screenX - grip.current.x)
-  }
-
-  return <div className={`hud-root${edit ? ' editing' : ''}${windowed ? ' windowed' : ''}`} style={{ width: SIZE, height: SIZE, transform: `scale(${scale})` }}>
-    <svg viewBox={`0 0 ${SIZE} ${SIZE}`} width={SIZE} height={SIZE}>
-      <circle cx={C} cy={C} r="150" className="hud-disk" />
-      {shown ? <>
-        <text x={C} y={C + 48} textAnchor="middle" className="hud-gear">{gearLabel(shown.gear ?? 1)}</text>
+  return <svg className="hud-gauge" viewBox={`0 0 ${SIZE} ${SIZE}`} role="img"
+    aria-label={shown ? `Speed ${Math.round(shown.speedKmh ?? 0)} kilometers per hour` : message.replace('\n', ' ')}>
+    <circle cx={C} cy={C} r="150" className="hud-disk" />
+    {shown ? <>
+      <g transform={`translate(${C} ${C}) scale(.78) translate(-${C} -${C})`}>
+        <text x={C} y={C + 48} textAnchor="middle" className="hud-gear">{shown.gear == null ? '—' : gearLabel(shown.gear)}</text>
         <PedalArc side="left" reading={brake} color="#ff3b30" showReference={showReference} />
         <PedalArc side="right" reading={throttle} color="#34c759" showReference={showReference} />
         {showReference && <>
@@ -180,12 +180,51 @@ export default function Hud() {
           <text x={C} y={226} className="hud-speed">{Math.round(shown.speedKmh ?? 0)}</text>
           <text x={C} y={240} className="hud-small">KM/H</text>
         </g>
-      </> : <>
-        <path d={arc('left', 1, RING)} className="hud-arc-bg" />
-        <path d={arc('right', 1, RING)} className="hud-arc-bg" />
-        {message.split('\n').map((line, index) => <text key={line} x={C} y={C + index * 18} textAnchor="middle" className="hud-small">{line}</text>)}
+      </g>
+      {fuel != null && Number.isFinite(fuel) && <>
+        <text x={C} y="9" textAnchor="middle" className="hud-fuel-label">FUEL {fuel.toFixed(1)} L</text>
+        {Array.from({ length: 10 }, (_, index) => <rect key={index} x={105 + index * 9} y="13" width="7" height="4" rx="1"
+          className={index < fuelBlocks ? (fuel < 10 ? 'hud-fuel-block low' : 'hud-fuel-block filled') : 'hud-fuel-block'} />)}
       </>}
-    </svg>
+      {tyres && [0, 1, 2, 3].map((index) => <TireTile key={index} label={['FL', 'FR', 'RL', 'RR'][index]}
+        x={index % 2 === 0 ? 8 : 214} y={index < 2 ? 22 : 244}
+        pressure={tyres.pressuresPsi[index]} temperature={tyres.coreTempsC[index]} />)}
+    </> : <>
+      <path d={arc('left', 1, RING)} className="hud-arc-bg" />
+      <path d={arc('right', 1, RING)} className="hud-arc-bg" />
+      {message.split('\n').map((line, index) => <text key={line} x={C} y={C + index * 18} textAnchor="middle" className="hud-small">{line}</text>)}
+    </>}
+  </svg>
+}
+
+export default function Hud() {
+  const { frame, status } = useLive()
+  const [scale, setScale] = useState(1)
+  const grip = useRef<{ x: number; width: number } | null>(null)
+  const edit = Boolean(status?.hud.edit)
+  const windowed = status?.settings.hudMode === 'window'
+  const showReference = status?.settings.coachMarkers !== false
+  const shownFrame = frame?.state === 'active' ? frame : edit ? DEMO : frame
+
+  useEffect(() => {
+    document.documentElement.classList.add('hud-page')
+    const resize = () => setScale(Math.min(window.innerWidth, window.innerHeight) / SIZE)
+    resize()
+    window.addEventListener('resize', resize)
+    return () => window.removeEventListener('resize', resize)
+  }, [])
+
+  function startResize(event: ReactPointerEvent<HTMLDivElement>) {
+    event.currentTarget.setPointerCapture(event.pointerId)
+    grip.current = { x: event.screenX, width: window.innerWidth }
+  }
+
+  function moveResize(event: ReactPointerEvent<HTMLDivElement>) {
+    if (grip.current) void window.fastrack.resizeHud(grip.current.width + event.screenX - grip.current.x)
+  }
+
+  return <div className={`hud-root${edit ? ' editing' : ''}${windowed ? ' windowed' : ''}`} style={{ width: SIZE, height: SIZE, transform: `scale(${scale})` }}>
+    <HudGauge frame={shownFrame} showReference={showReference} />
     {edit && <div className="hud-grip" onPointerDown={startResize} onPointerMove={moveResize} onPointerUp={() => { grip.current = null }} />}
   </div>
 }

@@ -63,6 +63,7 @@ interface LiveFrame {
   lapMs?: number
   rpm?: number
   maxRpm?: number
+  fuelLiters?: number
   tyres?: { pressuresPsi: number[]; coreTempsC: number[] }
   cue?: { id: string; clip: string; interrupt: boolean; text: string }
 }

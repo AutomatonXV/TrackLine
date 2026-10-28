@@ -3,6 +3,7 @@ import type { CSSProperties, DragEvent, PointerEvent as ReactPointerEvent } from
 import { Activity, ChevronLeft, ChevronRight, Crosshair, FileUp, Map, Navigation, Minus, Pause, Play, Plus, TriangleAlert, X } from 'lucide-react'
 import { fitToTrack, hasTrackModel } from './trackMap'
 import { sectorMarkers } from './data/sectors'
+import { HudGauge } from './Hud'
 import LivePanel from './LivePanel'
 import { indexAtTime, useLiveRun } from './useLiveRun'
 import './app.css'
@@ -474,6 +475,12 @@ export default function App() {
   const ghostFrac = live && live.lapTime != null && refTimes ? indexAtTime(refTimes, live.lapTime) : liveFrac
   const refFrac = live ? ghostFrac : playRefFrac
   const mineFrac = live ? liveFrac : playMineFrac
+  const replayFrame = (points: LapSample[] | null, fraction: number): LiveFrame | null => points ? {
+    state: 'active',
+    speedKmh: lerpAt(points, fraction, (point) => point.speed * 3.6),
+    throttle: { you: lerpAt(points, fraction, (point) => point.throttle), ref: 0 },
+    brake: { you: lerpAt(points, fraction, (point) => point.brake), ref: 0 },
+  } : null
   const liveDelta = live ? live.delta : analysis ? lerpAt(analysis.delta, refFrac, (value) => value) : null
   const mineColor = liveDelta != null && liveDelta > 0.005 ? SLOW : liveDelta != null && liveDelta < -0.005 ? FAST : NEUTRAL
   // Each stretch of my line is green where I gain on the reference and red where I lose.
@@ -689,6 +696,19 @@ export default function App() {
           })()}
         </g>
       </svg>
+
+      {hasLaps && !live && <div className="replay-huds">
+        {refPoints && <section className="replay-hud-card" aria-label="Reference lap HUD">
+          <strong>REFERENCE</strong>
+          <HudGauge frame={replayFrame(refPoints, refFrac)} showReference={false} />
+          <small>Recorded speed and pedal inputs</small>
+        </section>}
+        {minePoints && <section className="replay-hud-card mine" aria-label="Your lap HUD">
+          <strong>YOUR LAP</strong>
+          <HudGauge frame={replayFrame(minePoints, mineFrac)} showReference={false} />
+          <small>Recorded speed and pedal inputs</small>
+        </section>}
+      </div>}
 
       {!hasLaps && <div className="empty"><strong>Open a reference lap and your lap</strong><span>Both must be the same vehicle on the same track.</span></div>}
       {loading && <div className="empty small">Reading telemetry…</div>}

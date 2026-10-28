@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import type { PointerEvent as ReactPointerEvent } from 'react'
 import { CornerUpLeft, CornerUpRight, Flag, Map, MoveUpRight, Pause, Play, RotateCcw, RotateCw, ZoomIn, ZoomOut } from 'lucide-react'
 import { getTrackGuide, GUIDE_TRACKS, type GuideCorner, type GuidePoint, type GuideTrack } from './trackGuide'
 
@@ -34,6 +35,13 @@ function makeSpeedProfile(points: GuidePoint[], trackLength: number) {
     const cornerSpeed = Math.sqrt(1.25 * 9.81 / Math.max(curvature, 0.0001)) * 3.6
     return clamp(cornerSpeed, 90, 285)
   })
+}
+
+function blendLineColor(brake: number, throttle: number) {
+  const mix = throttle / Math.max(1, brake + throttle)
+  const start = [239, 78, 80]
+  const end = [52, 199, 89]
+  return `rgb(${start.map((value, index) => Math.round(value + (end[index] - value) * mix)).join(',')})`
 }
 
 function pointAtProgress(points: GuidePoint[], progress: number) {
@@ -118,18 +126,43 @@ export default function Preflight() {
   const [throttle, setThrottle] = useState(0)
   const [brake, setBrake] = useState(0)
   const [playRate, setPlayRate] = useState(1)
+  const [pan, setPan] = useState({ x: 0, y: 0 })
   const vehicleSpeed = useRef(0)
   const simulatedDistance = useRef(0)
+  const mapDrag = useRef<{ x: number; y: number; ox: number; oy: number; moved: boolean } | null>(null)
+  const suppressClick = useRef(false)
   const guide = useMemo(() => getTrackGuide(track), [track])
   const speedProfile = useMemo(() => makeSpeedProfile(guide.racingLine, guide.lengthMeters), [guide])
+  const racingSegments = useMemo(() => guide.racingLine.map((point, index) => {
+    const lookAhead = Math.max(1, Math.round(75 / guide.lengthMeters * speedProfile.length))
+    let target = speedProfile[index]
+    for (let offset = 1; offset <= lookAhead; offset += 1) {
+      target = Math.min(target, speedProfile[(index + offset) % speedProfile.length] + offset * 0.35)
+    }
+    const brake = clamp((speedProfile[index] - target - 2) * 5, 0, 100)
+    const throttle = clamp((target - speedProfile[index] + 2) * 4, 0, 100)
+    const next = guide.racingLine[(index + 1) % guide.racingLine.length]
+    return {
+      color: blendLineColor(brake, throttle),
+      points: `${point.x.toFixed(1)},${point.y.toFixed(1)} ${next.x.toFixed(1)},${next.y.toFixed(1)}`,
+    }
+  }), [guide, speedProfile])
   const mapGeometry = useMemo(() => ({
     road: pointString([...guide.leftEdge, ...guide.rightEdge.slice().reverse()]),
     leftBoundary: pointString([...guide.leftEdge, guide.leftEdge[0]]),
     rightBoundary: pointString([...guide.rightEdge, guide.rightEdge[0]]),
     centerline: pointString([...guide.centerline, guide.centerline[0]]),
-    racingLine: pointString([...guide.racingLine, guide.racingLine[0]]),
     corners: guide.corners.map((corner) => pointString(corner.line)),
   }), [guide])
+  const cornerLabels = useMemo(() => {
+    const center = guide.centerline.reduce((sum, point) => ({ x: sum.x + point.x / guide.centerline.length, y: sum.y + point.y / guide.centerline.length }), { x: 0, y: 0 })
+    return guide.corners.map((corner) => {
+      const dx = corner.points.apex.x - center.x
+      const dy = corner.points.apex.y - center.y
+      const length = Math.hypot(dx, dy) || 1
+      return { x: corner.points.apex.x + dx / length * 24, y: corner.points.apex.y + dy / length * 24 }
+    })
+  }, [guide])
   const active = guide.corners[selected] ?? guide.corners[0]
   const carPoint = useMemo(() => pointAtProgress(guide.racingLine, progress), [guide.racingLine, progress])
 
@@ -150,6 +183,7 @@ export default function Preflight() {
     setSelected(0)
     setRotation(0)
     setZoom(1)
+    setPan({ x: 0, y: 0 })
     simulatedDistance.current = 0
     vehicleSpeed.current = 0
     setProgress(0)
@@ -199,6 +233,27 @@ export default function Preflight() {
   if (!active) return <div className="preflight-empty">No track geometry is available for this circuit.</div>
 
   const changeZoom = (amount: number) => setZoom((value) => clamp(value + amount, 0.8, 4))
+  const onMapPointerDown = (event: ReactPointerEvent<SVGSVGElement>) => {
+    if ((event.target as Element).closest('.preflight-corner')) return
+    mapDrag.current = { x: event.clientX, y: event.clientY, ox: pan.x, oy: pan.y, moved: false }
+    event.currentTarget.setPointerCapture(event.pointerId)
+  }
+  const onMapPointerMove = (event: ReactPointerEvent<SVGSVGElement>) => {
+    const origin = mapDrag.current
+    if (!origin) return
+    const dx = event.clientX - origin.x
+    const dy = event.clientY - origin.y
+    if (!origin.moved && Math.hypot(dx, dy) < 4) return
+    origin.moved = true
+    const rect = event.currentTarget.getBoundingClientRect()
+    const scale = 1000 / Math.max(1, Math.min(rect.width, rect.height))
+    setPan({ x: origin.ox + dx * scale, y: origin.oy + dy * scale })
+  }
+  const onMapPointerUp = () => {
+    suppressClick.current = Boolean(mapDrag.current?.moved)
+    mapDrag.current = null
+    if (suppressClick.current) window.setTimeout(() => { suppressClick.current = false }, 0)
+  }
 
   return <div className="preflight">
     <header className="preflight-head">
@@ -227,6 +282,9 @@ export default function Preflight() {
             <button onClick={() => { setZoom(1); setRotation(0) }} title="Reset map view" aria-label="Reset map view"><Map size={15} /></button>
           </div>
           <svg className="preflight-map" viewBox="0 0 1000 1000" role="img" aria-label={`${track} turn-by-turn map`}
+            onPointerDown={onMapPointerDown} onPointerMove={onMapPointerMove} onPointerUp={onMapPointerUp}
+            onPointerCancel={() => { mapDrag.current = null }}
+            onClick={(event) => { if (suppressClick.current) { event.preventDefault(); event.stopPropagation() } }}
             onWheel={(event) => { event.preventDefault(); changeZoom(event.deltaY < 0 ? 0.15 : -0.15) }}>
             <defs>
               <linearGradient id="preflight-turn-gradient"
@@ -242,12 +300,13 @@ export default function Preflight() {
                 <stop offset="100%" stopColor="#34c759" />
               </linearGradient>
             </defs>
-            <g transform={`translate(500 500) rotate(${rotation}) scale(${zoom}) translate(-500 -500)`}>
+            <g transform={`translate(${pan.x} ${pan.y}) translate(500 500) rotate(${rotation}) scale(${zoom}) translate(-500 -500)`}>
               <polygon points={mapGeometry.road} className="preflight-road" />
               <polyline points={mapGeometry.leftBoundary} className="preflight-boundary" />
               <polyline points={mapGeometry.rightBoundary} className="preflight-boundary" />
               <polyline points={mapGeometry.centerline} className="preflight-center" />
-              <polyline points={mapGeometry.racingLine} className="preflight-racing-line" />
+              {racingSegments.map((segment, index) => <polyline key={`race-${index}`} points={segment.points}
+                className="preflight-racing-line" style={{ stroke: segment.color }} />)}
               {guide.corners.map((corner, index) => <polyline key={`line-${corner.number}`}
                 points={mapGeometry.corners[index]}
                 className={`preflight-racing-line-active${index === selected ? ' active' : ''}`}
@@ -255,7 +314,7 @@ export default function Preflight() {
               {guide.corners.map((corner, index) => <g key={corner.number} className={`preflight-corner${index === selected ? ' active' : ''}`}
                 onClick={() => { setSelected(index); seek(corner.startIndex / 1200) }} role="button" aria-label={`Select corner ${corner.number}`}>
                 <circle cx={corner.points.apex.x} cy={corner.points.apex.y} r={index === selected ? 18 : 14} className="preflight-corner-hit" />
-                <text x={corner.points.apex.x} y={corner.points.apex.y} textAnchor="middle" dominantBaseline="central">{corner.number}</text>
+                {index !== selected && <text x={cornerLabels[index].x} y={cornerLabels[index].y} textAnchor="middle" dominantBaseline="central">{corner.number}</text>}
               </g>)}
               <g transform={`translate(${carPoint.x} ${carPoint.y}) rotate(${carPoint.heading})`} className="preflight-car">
                 <circle r="13" />
@@ -263,7 +322,7 @@ export default function Preflight() {
               </g>
             </g>
           </svg>
-          <span className="preflight-wheel-hint">Scroll to zoom · Use arrows to rotate</span>
+          <span className="preflight-wheel-hint">Drag to pan · Scroll to zoom · Use arrows to rotate</span>
         </div>
         <div className="preflight-line-legend">
           <span className="brake-color">Braking</span><i /><span className="accelerate-color">Acceleration</span>

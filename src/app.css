@@ -97,17 +97,18 @@
 .preflight-map-title span { font-size: 12px; font-weight: 700; }
 .preflight-map-title small { color: var(--muted); font-size: 9px; }
 .preflight-map-viewport { display: flex; flex: 1 1 300px; align-items: center; justify-content: center; position: relative; width: 100%; min-height: 190px; overflow: hidden; border-radius: 8px; background: radial-gradient(ellipse at center, rgba(42, 51, 49, .35), transparent 70%); }
-.preflight-map { display: block; width: 100%; height: 100%; min-width: 0; min-height: 0; touch-action: none; }
+.preflight-map { display: block; width: 100%; height: 100%; min-width: 0; min-height: 0; touch-action: none; cursor: grab; }
+.preflight-map:active { cursor: grabbing; }
 .preflight-map-controls { display: flex; align-items: center; gap: 3px; position: absolute; top: 8px; right: 8px; z-index: 2; padding: 4px; border: 1px solid var(--line); border-radius: 7px; background: rgba(16, 19, 20, .92); }
 .preflight-map-controls button, .sim-actions button { display: grid; place-items: center; width: 27px; height: 26px; border: 1px solid transparent; border-radius: 5px; background: #222a2b; color: #dfe6e2; }
 .preflight-map-controls button:hover, .sim-actions button:hover { border-color: #6a8072; background: #2b3632; }
 .preflight-map-controls > span { min-width: 34px; color: var(--muted); font: 9px var(--mono); text-align: center; }
 .preflight-wheel-hint { position: absolute; bottom: 5px; left: 8px; color: #aab4af; font-size: 9px; opacity: .8; pointer-events: none; }
 .preflight-road { fill: #3a4544; stroke: none; }
-.preflight-boundary { fill: none; stroke: #75827d; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.preflight-boundary { fill: none; stroke: #9aa8a1; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
 .preflight-center { fill: none; stroke: #75827d; stroke-width: 2; stroke-dasharray: 4 5; stroke-linecap: round; stroke-linejoin: round; }
-.preflight-racing-line, .preflight-racing-line-active { fill: none; stroke: #8d9994; stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; opacity: .72; pointer-events: none; }
-.preflight-racing-line-active { stroke: #ef4e50; stroke-width: 9; opacity: 0; }
+.preflight-racing-line, .preflight-racing-line-active { fill: none; stroke-width: 8; stroke-linecap: round; stroke-linejoin: round; opacity: .95; pointer-events: none; }
+.preflight-racing-line-active { stroke: #ef4e50; stroke-width: 12; opacity: 0; }
 .preflight-racing-line-active.active { opacity: .98; }
 .preflight-corner { cursor: pointer; }
 .preflight-corner-hit { fill: #101314; fill-opacity: .92; stroke: #9daaa4; stroke-width: 2; }
@@ -197,10 +198,10 @@
 .stage { position: relative; flex: 1; min-height: 0; overflow: hidden; background: radial-gradient(ellipse at 40% 45%, #1b2223 0, #101314 70%); }
 .map { position: absolute; top: 0; left: 0; bottom: 0; width: calc(100% - var(--pane, 360px)); height: 100%; cursor: grab; touch-action: none; user-select: none; }
 .map:active { cursor: grabbing; }
-.track-fill { fill: rgba(140, 148, 160, .18); stroke: none; }
-.track-edge { fill: none; stroke: #5a6270; stroke-width: 1.5; stroke-linejoin: round; opacity: .8; vector-effect: non-scaling-stroke; }
-.line-ref { fill: none; stroke: #fff; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
-.line-mine { fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.track-fill { fill: rgba(140, 148, 160, .22); stroke: rgba(140, 148, 160, .16); stroke-width: 12; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.track-edge { fill: none; stroke: #7d8996; stroke-width: 2.5; stroke-linejoin: round; opacity: .9; vector-effect: non-scaling-stroke; }
+.line-ref { fill: none; stroke: #fff; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.line-mine { fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
 .loss-line { fill: none; stroke: #ffb020; stroke-width: 24; stroke-linecap: round; stroke-linejoin: round; opacity: .5; }
 .section-line { fill: none; stroke: #3fc8ff; stroke-width: 22; stroke-linecap: round; stroke-linejoin: round; opacity: .42; }
 .car-dot { stroke: #101314; stroke-width: 1.5; vector-effect: non-scaling-stroke; pointer-events: none; }
@@ -218,6 +219,20 @@
 .map-tools button:hover:not(:disabled) { border-color: #5a6663; }
 .map-tools button:disabled { opacity: .4; cursor: default; }
 .map-tools .active { background: #ffb020; border-color: #ffb020; color: #1b1300; }
+
+.replay-huds { position: absolute; top: 56px; right: calc(var(--pane, 360px) + 14px); display: flex; gap: 8px; pointer-events: none; }
+.replay-hud-card { display: flex; flex-direction: column; align-items: center; width: 168px; padding: 5px 5px 7px; border: 1px solid rgba(255,255,255,.16); border-radius: 9px; background: rgba(13,16,17,.86); }
+.replay-hud-card > strong { align-self: stretch; padding: 2px 6px; color: #fff; font: 700 9px var(--mono); letter-spacing: .12em; }
+.replay-hud-card.mine > strong { color: #34c759; }
+.replay-hud-card > small { color: var(--muted); font: 8px var(--mono); }
+.hud-gauge { display: block; width: 100%; height: auto; overflow: visible; }
+.hud-tire-tile { fill: rgba(13,16,17,.92); stroke: rgba(255,255,255,.28); stroke-width: 1; }
+.hud-tire-label { fill: #dfe6e2; font: 700 8px var(--mono); }
+.hud-tire-temp-bg, .hud-fuel-block { fill: #303a3b; }
+.hud-tire-pressure { fill: #e9ece8; font: 700 8px var(--mono); }
+.hud-fuel-label { fill: #dfe6e2; font: 700 7px var(--mono); }
+.hud-fuel-block.filled { fill: #34c759; }
+.hud-fuel-block.low { fill: #ff3b30; }
 
 .playbar { position: absolute; left: 14px; bottom: 14px; right: calc(var(--pane, 360px) + 14px); display: flex; align-items: center; gap: 12px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 9px; background: rgba(23, 28, 29, .9); font-family: var(--mono); font-size: 12px; }
 .playbar input[type=range] { flex: 1; accent-color: #fff; }

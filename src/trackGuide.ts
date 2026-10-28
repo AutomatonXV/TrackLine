@@ -43,6 +43,7 @@ const CORNER_THRESHOLD = 0.22
 const MERGE_GAP = 8
 const MARKER_APPROACH = 14
 const MARKER_TURN_IN = 4
+const MAP_WIDTH_VISUAL_SCALE = 1.6
 
 const wrap = (index: number, length: number) => ((index % length) + length) % length
 const distance = (a: GuidePoint, b: GuidePoint) => Math.hypot(b.x - a.x, b.y - a.y)
@@ -141,10 +142,18 @@ function fitToMap(centerline: TrackPoint[], left: GuidePoint[], right: GuidePoin
     x: offsetX + (point.x - minX) * scale,
     y: 1000 - offsetY - (point.y - minY) * scale,
   })
+  const widen = (point: GuidePoint, center: GuidePoint) => {
+    const edge = fit(point)
+    const middle = fit(center)
+    return {
+      x: middle.x + (edge.x - middle.x) * MAP_WIDTH_VISUAL_SCALE,
+      y: middle.y + (edge.y - middle.y) * MAP_WIDTH_VISUAL_SCALE,
+    }
+  }
   return {
     centerline: centerline.map(fit),
-    leftEdge: left.map(fit),
-    rightEdge: right.map(fit),
+    leftEdge: left.map((point, index) => widen(point, centerline[index])),
+    rightEdge: right.map((point, index) => widen(point, centerline[index])),
     racingLine: racingLine.map(fit),
   }
 }
