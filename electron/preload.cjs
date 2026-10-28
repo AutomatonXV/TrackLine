@@ -16,7 +16,7 @@ contextBridge.exposeInMainWorld('fastrack', {
   importSetup: () => ipcRenderer.invoke('setup:import'),
   clearSetup: () => ipcRenderer.invoke('setup:clear'),
   getPendingSetupFeedback: () => ipcRenderer.invoke('setup:pending-feedback'),
-  submitSetupFeedback: (sessionId, issue) => ipcRenderer.invoke('setup:submit-feedback', { sessionId, issue }),
+  submitSetupFeedback: (sessionId, issue, tyres) => ipcRenderer.invoke('setup:submit-feedback', { sessionId, issue, tyres }),
   dismissSetupFeedback: (sessionId) => ipcRenderer.invoke('setup:dismiss-feedback', sessionId),
   onSetupFeedback: (callback) => {
     const handler = (_event, feedback) => callback(feedback)

@@ -126,7 +126,7 @@ app.whenReady().then(() => {
     writeState(state)
   })
   ipcMain.handle('setup:pending-feedback', () => readState().setupFeedbackQueue[0] || null)
-  ipcMain.handle('setup:submit-feedback', (_event, { sessionId, issue }) => {
+  ipcMain.handle('setup:submit-feedback', (_event, { sessionId, issue, tyres }) => {
     const state = readState()
     const feedback = state.setupFeedbackQueue.find((entry) => entry.id === sessionId)
     if (!feedback) throw new Error('This session feedback has already been completed.')
@@ -144,6 +144,7 @@ app.whenReady().then(() => {
       car: feedback.car,
       track: feedback.track,
       issue,
+      tyres,
     })
     state.setupPath = result.setup.path
     state.setupFeedbackQueue = state.setupFeedbackQueue.filter((entry) => entry.id !== sessionId)

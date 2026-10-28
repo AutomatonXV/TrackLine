@@ -7,6 +7,17 @@ const seconds = (value: number) => {
 }
 
 const wheelNames = ['FL', 'FR', 'RL', 'RR']
+const quizIssues: { key: SetupIssue; title: string; caption: string; icon: typeof MoveRight }[] = [
+  { key: 'entryUndersteer', title: 'Front pushes wide', caption: 'Understeer on corner entry', icon: MoveRight },
+  { key: 'entryOversteer', title: 'Rear steps out', caption: 'Oversteer on corner entry', icon: RotateCcw },
+  { key: 'midUndersteer', title: 'Won’t hold the line', caption: 'Understeer mid-corner', icon: MoveRight },
+  { key: 'midOversteer', title: 'Rear rotates too much', caption: 'Oversteer mid-corner', icon: RotateCcw },
+  { key: 'exitUndersteer', title: 'Runs wide under power', caption: 'Understeer on corner exit', icon: MoveRight },
+  { key: 'exitOversteer', title: 'Rear spins on exit', caption: 'Oversteer under acceleration', icon: RotateCcw },
+  { key: 'brakingStability', title: 'Unstable under braking', caption: 'Not enough confidence slowing down', icon: Gauge },
+  { key: 'tyrePressure', title: 'Tyre pressure or temperature', caption: 'Enter the in-game readings for a pressure check', icon: Gauge },
+  { key: 'balanced', title: 'Felt balanced', caption: 'Save an unchanged baseline copy', icon: CircleCheck },
+]
 const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, '')
 const normalizeTrack = (value: string) => {
   const track = normalize(value)
@@ -27,7 +38,10 @@ export default function LivePanel() {
   const [setupError, setSetupError] = useState('')
   const [setupBusy, setSetupBusy] = useState(false)
   const [feedback, setFeedback] = useState<SetupFeedback | null>(null)
-  const [feedbackIssue, setFeedbackIssue] = useState<'frontPush' | 'rearLoose' | 'brakingStability' | 'balanced' | null>(null)
+  const [feedbackIssue, setFeedbackIssue] = useState<SetupIssue | null>(null)
+  const [feedbackPressures, setFeedbackPressures] = useState(['', '', '', ''])
+  const [feedbackTemperatures, setFeedbackTemperatures] = useState(['', '', '', ''])
+  const [feedbackConditions, setFeedbackConditions] = useState<'dry' | 'wet'>('dry')
   const [feedbackResult, setFeedbackResult] = useState<SetupVariant | null>(null)
   const [feedbackBusy, setFeedbackBusy] = useState(false)
   const [feedbackError, setFeedbackError] = useState('')
@@ -53,6 +67,9 @@ export default function LivePanel() {
       if (!active || !next) return
       setFeedback(next)
       setFeedbackIssue(null)
+      setFeedbackPressures(['', '', '', ''])
+      setFeedbackTemperatures(['', '', '', ''])
+      setFeedbackConditions('dry')
       setFeedbackResult(null)
       setFeedbackError('')
     }
@@ -103,10 +120,20 @@ export default function LivePanel() {
   }
   const saveFeedback = async () => {
     if (!feedback || !feedbackIssue) return
+    const tyres = feedbackIssue === 'tyrePressure' ? {
+      pressuresPsi: feedbackPressures.map(Number),
+      temperaturesC: feedbackTemperatures.map(Number),
+      conditions: feedbackConditions,
+    } : undefined
+    if (tyres && (tyres.pressuresPsi.some((value, index) => !feedbackPressures[index].trim() || !Number.isFinite(value) || value < 20 || value > 40)
+      || tyres.temperaturesC.some((value, index) => !feedbackTemperatures[index].trim() || !Number.isFinite(value) || value < 0 || value > 160))) {
+      setFeedbackError('Enter an in-game pressure (20–40 psi) and temperature (0–160°C) for all four tyres.')
+      return
+    }
     setFeedbackBusy(true)
     setFeedbackError('')
     try {
-      const result = await window.fastrack.submitSetupFeedback(feedback.id, feedbackIssue)
+      const result = await window.fastrack.submitSetupFeedback(feedback.id, feedbackIssue, tyres)
       setFeedbackResult(result)
       setSetup(result.setup)
     } catch (error) {
@@ -131,6 +158,8 @@ export default function LivePanel() {
   const connected = Boolean(status?.connected)
   const lateral = frame?.lateral
   const tyres = frame?.tyres
+  const nissanReference = feedback && normalize(feedback.car) === 'nissangtrgt32018'
+    && normalizeTrack(feedback.track) === 'monza'
   const matchingSetup = Boolean(setup && connected && status && setupMatches(setup, status.car, status.track))
   const tyresWarm = Boolean(tyres && tyres.coreTempsC.length === 4 && tyres.coreTempsC.every((temp) => Number.isFinite(temp) && temp >= 80))
   const pressureSamples = pressureHistory.current
@@ -228,18 +257,35 @@ export default function LivePanel() {
           <p className="feedback-kicker">POST-SESSION SETUP QUIZ</p>
           <h2 id="feedback-title">How did the {feedback.car} feel?</h2>
           <p className="feedback-session">{feedback.track} · {Math.floor(feedback.durationSeconds / 60)} min · {feedback.completedLaps} completed laps · max {feedback.maxSpeedKmh} km/h</p>
-          <p>Pick the main thing you noticed. We’ll save a separate setup copy with one small change; your original stays untouched.</p>
+          <p>Where in the corner did you notice the main handling issue? We’ll save a separate copy with one small change; your original stays untouched.</p>
+          {nissanReference && <p className="nissan-reference">
+            Nissan GT-R 2018 reference: a community setup labelled ACC v1.10 for Monza lists raw setup values of front/rear anti-roll bar 4/2, brake bias 36 and differential preload 0. This is a track-specific comparison, not a universal target; your imported setup remains the starting point.
+            {' '}<a href="https://github.com/Lon3035/ACC_Setups/blob/11f41f9bba08e4ed39566e2be6ac893651e2f09b/nissan_gt_r_gt3_2018/monza/FRI3_GTR18_BASE_v1.10.json" target="_blank" rel="noreferrer">View the community v1.10 reference</a>.
+          </p>}
           <div className="feedback-options">
-            {([
-              ['frontPush', <MoveRight size={22} />, 'Front pushes wide', 'Understeer on turn-in'],
-              ['rearLoose', <RotateCcw size={22} />, 'Rear steps out', 'Oversteer on turn-in'],
-              ['brakingStability', <Gauge size={22} />, 'Unstable under braking', 'Not enough confidence slowing down'],
-              ['balanced', <CircleCheck size={22} />, 'Felt balanced', 'Save an unchanged baseline copy'],
-            ] as const).map(([key, icon, title, caption]) =>
+            {quizIssues.map(({ key, icon: Icon, title, caption }) =>
               <button key={key} className={`feedback-option${feedbackIssue === key ? ' selected' : ''}`} onClick={() => setFeedbackIssue(key)}>
-                {icon}<b>{title}</b><small>{caption}</small>
+                <Icon size={22} /><b>{title}</b><small>{caption}</small>
               </button>)}
           </div>
+          {feedbackIssue === 'tyrePressure' && <div className="quiz-tyre-readings">
+            <div className="quiz-conditions" role="group" aria-label="Track conditions">
+              <span>CONDITIONS</span>
+              <button className={feedbackConditions === 'dry' ? 'selected' : ''} onClick={() => setFeedbackConditions('dry')}>Dry · GT3 target 26–27.2 psi</button>
+              <button className={feedbackConditions === 'wet' ? 'selected' : ''} onClick={() => setFeedbackConditions('wet')}>Wet · GT3 target 30–31 psi</button>
+            </div>
+            <p>Enter the in-game hot pressure and tyre temperature shown for each wheel. Temperatures help flag when pressure is not the only issue.</p>
+            <div className="quiz-tyre-grid">
+              {wheelNames.map((wheel, index) => <div key={wheel}>
+                <b>{wheel}</b>
+                <label>Pressure (psi)<input aria-label={`${wheel} in-game pressure PSI`} type="number" min="20" max="40" step="0.1" value={feedbackPressures[index]}
+                  onChange={(event) => setFeedbackPressures((values) => values.map((value, current) => current === index ? event.target.value : value))} /></label>
+                <label>Temp (°C)<input aria-label={`${wheel} in-game temperature Celsius`} type="number" min="0" max="160" step="1" value={feedbackTemperatures[index]}
+                  onChange={(event) => setFeedbackTemperatures((values) => values.map((value, current) => current === index ? event.target.value : value))} /></label>
+              </div>)}
+            </div>
+            <small>GT3 pressure changes are capped at ±1 psi per tyre and use the imported setup’s native pressure increments. Other car classes are saved without pressure changes because their native pressure scale may differ. If any tyre is outside 70–100°C, TrackLine also skips pressure changes and recommends checking warm-up/conditions first.</small>
+          </div>}
           {feedbackError && <p className="live-warn">{feedbackError}</p>}
           <div className="feedback-actions">
             <button className="setup-icon" onClick={() => void importSetup()}>Import setup for this car</button>

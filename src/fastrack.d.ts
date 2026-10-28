@@ -86,6 +86,15 @@ interface SetupFeedback {
   endedAt: number
 }
 
+type SetupIssue = 'entryUndersteer' | 'entryOversteer' | 'midUndersteer' | 'midOversteer'
+  | 'exitUndersteer' | 'exitOversteer' | 'brakingStability' | 'tyrePressure' | 'balanced'
+
+interface SetupQuizTyres {
+  pressuresPsi: number[]
+  temperaturesC: number[]
+  conditions: 'dry' | 'wet'
+}
+
 interface SetupVariant {
   setup: SetupSummary
   issue: string
@@ -129,7 +138,7 @@ interface Window {
     importSetup: () => Promise<SetupSummary | null>
     clearSetup: () => Promise<void>
     getPendingSetupFeedback: () => Promise<SetupFeedback | null>
-    submitSetupFeedback: (sessionId: string, issue: 'frontPush' | 'rearLoose' | 'brakingStability' | 'balanced') => Promise<SetupVariant>
+    submitSetupFeedback: (sessionId: string, issue: SetupIssue, tyres?: SetupQuizTyres) => Promise<SetupVariant>
     dismissSetupFeedback: (sessionId: string) => Promise<void>
     onSetupFeedback: (callback: (feedback: SetupFeedback) => void) => () => void
   }

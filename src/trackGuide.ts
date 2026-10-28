@@ -4,6 +4,7 @@ import nurburgringTrack from './data/tumftm/tracks/nurburgring.csv?raw'
 import monzaLine from './data/tumftm/racelines/monza.csv?raw'
 import spaLine from './data/tumftm/racelines/spa.csv?raw'
 import nurburgringLine from './data/tumftm/racelines/nurburgring.csv?raw'
+import type { RacingLineSearchSpace } from './racingLineOptimizer'
 
 export const GUIDE_TRACKS = ['Monza', 'Spa-Francorchamps', 'Nürburgring GP'] as const
 export type GuideTrack = typeof GUIDE_TRACKS[number]
@@ -26,6 +27,7 @@ export interface TrackGuide {
   rightEdge: GuidePoint[]
   centerline: GuidePoint[]
   racingLine: GuidePoint[]
+  optimizer: RacingLineSearchSpace
   corners: GuideCorner[]
 }
 
@@ -148,11 +150,25 @@ function fitToMap(centerline: TrackPoint[], left: GuidePoint[], right: GuidePoin
     x: offsetX + (point.x - minX) * scale,
     y: 1000 - offsetY - (point.y - minY) * scale,
   })
+  const mappedCenterline = centerline.map(fit)
+  const optimizer: RacingLineSearchSpace = {
+    center: mappedCenterline,
+    normals: centerline.map((_, index) => {
+      const before = centerline[wrap(index - 1, centerline.length)]
+      const after = centerline[(index + 1) % centerline.length]
+      const length = distance(before, after) || 1
+      return { x: -(after.y - before.y) / length, y: -(after.x - before.x) / length }
+    }),
+    leftLimit: centerline.map((point) => point.leftWidth * scale * 0.88),
+    rightLimit: centerline.map((point) => point.rightWidth * scale * 0.88),
+    metersPerMapUnit: 1 / scale,
+  }
   return {
-    centerline: centerline.map(fit),
+    centerline: mappedCenterline,
     leftEdge: wideLeft.map(fit),
     rightEdge: wideRight.map(fit),
     racingLine: racingLine.map(fit),
+    optimizer,
   }
 }
 

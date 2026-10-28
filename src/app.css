@@ -70,12 +70,25 @@
 .feedback-card h2 { margin: 0 36px 8px 0; font-size: 24px; }
 .feedback-card > p:not(.feedback-kicker) { color: #b6c0bb; font-size: 12px; line-height: 1.5; }
 .feedback-session { margin: 0 0 16px; color: var(--muted) !important; }
-.feedback-options { display: grid; grid-template-columns: repeat(2, 1fr); gap: 9px; margin: 18px 0; }
-.feedback-option { display: grid; justify-items: start; gap: 6px; min-height: 112px; padding: 13px; border: 1px solid var(--line); border-radius: 10px; background: #1d2424; color: #dfe6e2; text-align: left; }
+.feedback-options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; margin: 18px 0; }
+.feedback-option { display: grid; justify-items: start; gap: 6px; min-height: 96px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: #1d2424; color: #dfe6e2; text-align: left; }
 .feedback-option svg { color: #a9e36e; }
 .feedback-option b { font-size: 13px; }
 .feedback-option small { color: var(--muted); font-size: 10px; }
 .feedback-option:hover, .feedback-option.selected { border-color: #8ab4a8; background: rgba(138, 180, 168, .13); }
+.nissan-reference { padding: 10px; border: 1px solid rgba(169,227,110,.3); border-radius: 8px; background: rgba(169,227,110,.06); }
+.nissan-reference a { color: var(--green); }
+.quiz-tyre-readings { display: flex; flex-direction: column; gap: 9px; margin: 10px 0 16px; padding: 12px; border: 1px solid var(--line); border-radius: 9px; background: rgba(0,0,0,.14); }
+.quiz-tyre-readings > p, .quiz-tyre-readings > small { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.4; }
+.quiz-conditions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.quiz-conditions > span { margin-right: auto; color: var(--muted); font-size: 9px; letter-spacing: .12em; }
+.quiz-conditions button { padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: #222a2b; font-size: 10px; }
+.quiz-conditions button.selected { border-color: var(--green); color: var(--green); }
+.quiz-tyre-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.quiz-tyre-grid > div { display: flex; flex-direction: column; gap: 5px; padding: 7px; border: 1px solid var(--line); border-radius: 7px; background: #1d2424; }
+.quiz-tyre-grid > div > b { color: var(--green); font: 700 10px var(--mono); }
+.quiz-tyre-grid label { display: flex; flex-direction: column; gap: 3px; color: var(--muted); font-size: 9px; }
+.quiz-tyre-grid input { width: 100%; min-width: 0; padding: 5px; border: 1px solid var(--line); border-radius: 5px; background: #101314; color: #e9ece8; font: 11px var(--mono); }
 .feedback-actions { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 16px; }
 .feedback-primary { min-height: 36px; padding: 8px 14px; border: 1px solid #8ab4a8; border-radius: 8px; background: #314741; color: #f0fff8; font-size: 11px; font-weight: 700; }
 .feedback-primary:disabled { opacity: .45; cursor: default; }
@@ -93,66 +106,35 @@
 .preflight-layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 14px; flex: 1; min-height: 0; }
 .preflight-map-card, .preflight-guide { min-height: 0; border: 1px solid var(--line); border-radius: 11px; background: rgba(23, 28, 29, .82); }
 .preflight-map-card { display: flex; flex-direction: column; position: relative; overflow: hidden; padding: 10px 14px; }
-.preflight-map-title { display: flex; justify-content: space-between; align-items: baseline; width: 100%; padding: 2px 6px 6px; }
+.preflight-map-title { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; width: 100%; padding: 2px 6px 6px; }
 .preflight-map-title span { font-size: 12px; font-weight: 700; }
 .preflight-map-title small { color: var(--muted); font-size: 9px; }
+.preflight-map-title .preflight-optimizer-status { color: #b7d9c1; font: 8px var(--mono); text-align: right; }
 .preflight-map-viewport { display: flex; flex: 1 1 300px; align-items: center; justify-content: center; position: relative; width: 100%; min-height: 190px; overflow: hidden; border-radius: 8px; background: radial-gradient(ellipse at center, rgba(42, 51, 49, .35), transparent 70%); }
 .preflight-map { display: block; width: 100%; height: 100%; min-width: 0; min-height: 0; touch-action: none; cursor: grab; }
 .preflight-map:active { cursor: grabbing; }
 .preflight-map-controls { display: flex; align-items: center; gap: 3px; position: absolute; top: 8px; right: 8px; z-index: 2; padding: 4px; border: 1px solid var(--line); border-radius: 7px; background: rgba(16, 19, 20, .92); }
-.preflight-map-controls button, .sim-actions button { display: grid; place-items: center; width: 27px; height: 26px; border: 1px solid transparent; border-radius: 5px; background: #222a2b; color: #dfe6e2; }
-.preflight-map-controls button:hover, .sim-actions button:hover { border-color: #6a8072; background: #2b3632; }
+.preflight-map-controls button { display: grid; place-items: center; width: 27px; height: 26px; border: 1px solid transparent; border-radius: 5px; background: #222a2b; color: #dfe6e2; }
+.preflight-map-controls button:hover { border-color: #6a8072; background: #2b3632; }
 .preflight-map-controls > span { min-width: 34px; color: var(--muted); font: 9px var(--mono); text-align: center; }
 .preflight-wheel-hint { position: absolute; bottom: 5px; left: 8px; color: #aab4af; font-size: 9px; opacity: .8; pointer-events: none; }
 .preflight-road { fill: #3a4544; stroke: none; }
 .preflight-boundary { fill: none; stroke: #c0ccc5; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
 .preflight-center { fill: none; stroke: #75827d; stroke-width: 2; stroke-dasharray: 4 5; stroke-linecap: round; stroke-linejoin: round; }
-.preflight-racing-line, .preflight-racing-line-active { fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; opacity: .98; pointer-events: none; }
-.preflight-racing-line-active { stroke: #ef4e50; stroke-width: 4; opacity: 0; }
-.preflight-racing-line-active.active { opacity: .98; }
+.preflight-racing-line { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; opacity: .98; pointer-events: none; }
+.preflight-racing-candidate { fill: none; stroke: #d5e0dc; stroke-width: 1.25; stroke-dasharray: 4 5; opacity: .22; pointer-events: none; }
 .preflight-corner { cursor: pointer; }
 .preflight-corner-hit { fill: transparent; stroke: none; pointer-events: all; }
 .preflight-corner text { fill: #e9ece8; stroke: #101314; stroke-width: 4px; paint-order: stroke; font: 800 14px var(--mono); pointer-events: none; }
 .preflight-corner.active text { fill: #ffd60a; }
 .preflight-corner:focus { outline: none; }
 .preflight-corner:focus text { fill: #fff; }
-.preflight-car circle { fill: #101314; stroke: #f3f5f2; stroke-width: 3; }
-.preflight-car path { fill: #a9e36e; }
 .preflight-line-legend { display: flex; align-items: center; gap: 7px; flex: none; padding: 5px 4px; color: var(--muted); font-size: 9px; }
-.preflight-line-legend > i { flex: 1; height: 5px; border-radius: 5px; background: linear-gradient(90deg, #ef4e50, #ff8a80 35%, #f0ad50 55%, #a9e36e 78%, #34c759); }
+.preflight-line-legend > i { flex: 1; height: 3px; border-radius: 5px; background: linear-gradient(90deg, #ef4e50, #f0ad50 50%, #34c759); }
 .brake-color { color: #ff8a80; }
 .accelerate-color { color: #a9e36e; }
 .line-legend-note { margin-left: auto; }
 .preflight-caveat { max-width: 940px; margin: 2px 8px; color: var(--muted); font-size: 9px; line-height: 1.4; text-align: center; }
-.preflight-sim { display: grid; grid-template-columns: 126px minmax(120px, 1fr) 116px; align-items: center; gap: 12px; flex: none; min-height: 94px; padding: 7px 10px; border: 1px solid #39433f; border-radius: 9px; background: linear-gradient(120deg, #151a1b, #202725 56%, #151a1b); box-shadow: inset 0 0 18px rgba(0, 0, 0, .35); }
-.sim-gauge-wrap { display: flex; align-items: center; }
-.sim-gauge { position: relative; width: 86px; height: 70px; }
-.sim-gauge svg { width: 100%; height: 100%; overflow: visible; }
-.sim-gauge-track { fill: none; stroke: #58615d; stroke-width: 5; stroke-linecap: round; }
-.sim-gauge-green, .sim-gauge-red { fill: none; stroke: #a9e36e; stroke-width: 5; stroke-linecap: round; }
-.sim-gauge-red { stroke: #ef4e50; }
-.sim-gauge-needle { stroke: #edf2ee; stroke-width: 2; stroke-linecap: round; }
-.sim-gauge-hub { fill: #edf2ee; }
-.sim-gauge-readout { display: flex; flex-direction: column; align-items: center; position: absolute; right: 0; bottom: 3px; left: 0; line-height: 1; }
-.sim-gauge-readout b { font: 700 17px var(--mono); }
-.sim-gauge-readout small, .sim-gear small { color: var(--muted); font-size: 7px; letter-spacing: .1em; }
-.sim-gear { display: flex; flex-direction: column; align-items: center; gap: 2px; padding-left: 8px; border-left: 1px solid #39433f; }
-.sim-gear b { color: #e6efe9; font: 700 25px var(--mono); }
-.sim-inputs { display: grid; gap: 8px; min-width: 0; }
-.sim-input-row { display: grid; grid-template-columns: 51px minmax(20px, 1fr) 29px; align-items: center; gap: 6px; color: var(--muted); font-size: 8px; letter-spacing: .04em; }
-.sim-input-row b { color: #dfe6e2; font: 600 8px var(--mono); text-align: right; }
-.sim-input-track { height: 7px; overflow: hidden; border-radius: 5px; background: #313936; }
-.sim-input-track i { display: block; height: 100%; border-radius: inherit; transition: width .12s linear; }
-.sim-brake { background: linear-gradient(90deg, #d94a4f, #ff8a80); }
-.sim-throttle { background: linear-gradient(90deg, #8abd51, #34c759); }
-.sim-progress { display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: 8px; }
-.sim-progress input { flex: 1; min-width: 20px; height: 12px; accent-color: #a9e36e; }
-.sim-progress small { min-width: 24px; color: #dfe6e2; font: 8px var(--mono); text-align: right; }
-.sim-actions { display: grid; grid-template-columns: 1fr 29px 29px; align-items: center; gap: 4px; }
-.sim-actions strong { grid-column: 1 / -1; color: #a9e36e; font-size: 9px; letter-spacing: .1em; }
-.sim-actions strong small { display: block; margin-top: 2px; color: var(--muted); font-size: 7px; letter-spacing: .08em; }
-.sim-actions button { width: 29px; height: 28px; }
-.sim-actions select { grid-column: 1 / -1; width: 100%; padding: 3px 5px; border: 1px solid var(--line); border-radius: 5px; background: #171c1d; color: #dfe6e2; font-size: 9px; }
 .preflight-guide { display: flex; flex-direction: column; overflow: hidden; }
 .preflight-guide-title { display: flex; justify-content: space-between; align-items: center; padding: 13px 14px; border-bottom: 1px solid var(--line); font-size: 10px; color: var(--muted); }
 .preflight-guide-title > div { display: flex; align-items: center; gap: 7px; color: #e9ece8; font-size: 12px; }
@@ -181,9 +163,6 @@
   .preflight { padding: 12px; }
   .preflight-layout { grid-template-columns: minmax(0, 1fr) 290px; gap: 9px; }
   .preflight-map-card { padding: 8px; }
-  .preflight-sim { grid-template-columns: 102px minmax(100px, 1fr) 100px; gap: 7px; padding: 6px; }
-  .sim-gauge { width: 75px; }
-  .sim-gear { padding-left: 5px; }
 }
 
 @media (max-width: 760px) {
@@ -194,6 +173,10 @@
   .preflight-guide { min-height: 380px; }
   .preflight-map-controls { gap: 2px; }
   .preflight-map-controls button { width: 24px; }
+}
+@media (max-width: 600px) {
+  .feedback-options { grid-template-columns: repeat(2, 1fr); }
+  .quiz-tyre-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
 .stage { position: relative; flex: 1; min-height: 0; overflow: hidden; background: radial-gradient(ellipse at 40% 45%, #1b2223 0, #101314 70%); }
