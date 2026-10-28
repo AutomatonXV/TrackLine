@@ -105,16 +105,17 @@
 .preflight-map-controls > span { min-width: 34px; color: var(--muted); font: 9px var(--mono); text-align: center; }
 .preflight-wheel-hint { position: absolute; bottom: 5px; left: 8px; color: #aab4af; font-size: 9px; opacity: .8; pointer-events: none; }
 .preflight-road { fill: #3a4544; stroke: none; }
-.preflight-boundary { fill: none; stroke: #9aa8a1; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.preflight-boundary { fill: none; stroke: #c0ccc5; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
 .preflight-center { fill: none; stroke: #75827d; stroke-width: 2; stroke-dasharray: 4 5; stroke-linecap: round; stroke-linejoin: round; }
-.preflight-racing-line, .preflight-racing-line-active { fill: none; stroke-width: 8; stroke-linecap: round; stroke-linejoin: round; opacity: .95; pointer-events: none; }
-.preflight-racing-line-active { stroke: #ef4e50; stroke-width: 12; opacity: 0; }
+.preflight-racing-line, .preflight-racing-line-active { fill: none; stroke-width: 9; stroke-linecap: round; stroke-linejoin: round; opacity: .98; pointer-events: none; }
+.preflight-racing-line-active { stroke: #ef4e50; stroke-width: 13; opacity: 0; }
 .preflight-racing-line-active.active { opacity: .98; }
 .preflight-corner { cursor: pointer; }
-.preflight-corner-hit { fill: #101314; fill-opacity: .92; stroke: #9daaa4; stroke-width: 2; }
-.preflight-corner text { fill: #e9ece8; font: 700 11px var(--mono); pointer-events: none; }
-.preflight-corner.active .preflight-corner-hit { fill: #f0ad50; stroke: #fff0cf; stroke-width: 3; }
-.preflight-corner.active text { fill: #151718; }
+.preflight-corner-hit { fill: transparent; stroke: none; pointer-events: all; }
+.preflight-corner text { fill: #e9ece8; stroke: #101314; stroke-width: 4px; paint-order: stroke; font: 800 14px var(--mono); pointer-events: none; }
+.preflight-corner.active text { fill: #ffd60a; }
+.preflight-corner:focus { outline: none; }
+.preflight-corner:focus text { fill: #fff; }
 .preflight-car circle { fill: #101314; stroke: #f3f5f2; stroke-width: 3; }
 .preflight-car path { fill: #a9e36e; }
 .preflight-line-legend { display: flex; align-items: center; gap: 7px; flex: none; padding: 5px 4px; color: var(--muted); font-size: 9px; }
@@ -220,16 +221,16 @@
 .map-tools button:disabled { opacity: .4; cursor: default; }
 .map-tools .active { background: #ffb020; border-color: #ffb020; color: #1b1300; }
 
-.replay-huds { position: absolute; top: 56px; right: calc(var(--pane, 360px) + 14px); display: flex; gap: 8px; pointer-events: none; }
+.replay-huds { position: absolute; left: 14px; bottom: 72px; display: flex; gap: 8px; pointer-events: none; z-index: 1; }
 .replay-hud-card { display: flex; flex-direction: column; align-items: center; width: 168px; padding: 5px 5px 7px; border: 1px solid rgba(255,255,255,.16); border-radius: 9px; background: rgba(13,16,17,.86); }
 .replay-hud-card > strong { align-self: stretch; padding: 2px 6px; color: #fff; font: 700 9px var(--mono); letter-spacing: .12em; }
 .replay-hud-card.mine > strong { color: #34c759; }
 .replay-hud-card > small { color: var(--muted); font: 8px var(--mono); }
 .hud-gauge { display: block; width: 100%; height: auto; overflow: visible; }
-.hud-tire-tile { fill: rgba(13,16,17,.92); stroke: rgba(255,255,255,.28); stroke-width: 1; }
-.hud-tire-label { fill: #dfe6e2; font: 700 8px var(--mono); }
-.hud-tire-temp-bg, .hud-fuel-block { fill: #303a3b; }
-.hud-tire-pressure { fill: #e9ece8; font: 700 8px var(--mono); }
+.hud-tire-temp-bg { fill: rgba(255,255,255,.16); }
+.hud-fuel-block { fill: #303a3b; }
+.hud-tire-pressure { fill: #e9ece8; font: 700 9px var(--mono); }
+.hud-tire-unit { fill: #9aa0aa; font: 6px var(--mono); }
 .hud-fuel-label { fill: #dfe6e2; font: 700 7px var(--mono); }
 .hud-fuel-block.filled { fill: #34c759; }
 .hud-fuel-block.low { fill: #ff3b30; }

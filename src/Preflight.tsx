@@ -157,10 +157,20 @@ export default function Preflight() {
   const cornerLabels = useMemo(() => {
     const center = guide.centerline.reduce((sum, point) => ({ x: sum.x + point.x / guide.centerline.length, y: sum.y + point.y / guide.centerline.length }), { x: 0, y: 0 })
     return guide.corners.map((corner) => {
-      const dx = corner.points.apex.x - center.x
-      const dy = corner.points.apex.y - center.y
-      const length = Math.hypot(dx, dy) || 1
-      return { x: corner.points.apex.x + dx / length * 24, y: corner.points.apex.y + dy / length * 24 }
+      const index = corner.apexIndex
+      const before = guide.centerline[(index - 2 + guide.centerline.length) % guide.centerline.length]
+      const after = guide.centerline[(index + 2) % guide.centerline.length]
+      const trackCenter = guide.centerline[index]
+      const length = Math.hypot(after.x - before.x, after.y - before.y) || 1
+      let nx = -(after.y - before.y) / length
+      let ny = (after.x - before.x) / length
+      if (nx * (trackCenter.x - center.x) + ny * (trackCenter.y - center.y) < 0) { nx = -nx; ny = -ny }
+      const width = Math.max(
+        Math.hypot(guide.leftEdge[index].x - trackCenter.x, guide.leftEdge[index].y - trackCenter.y),
+        Math.hypot(guide.rightEdge[index].x - trackCenter.x, guide.rightEdge[index].y - trackCenter.y),
+      )
+      const offset = width + 20
+      return { x: corner.points.apex.x + nx * offset, y: corner.points.apex.y + ny * offset }
     })
   }, [guide])
   const active = guide.corners[selected] ?? guide.corners[0]
@@ -312,9 +322,21 @@ export default function Preflight() {
                 className={`preflight-racing-line-active${index === selected ? ' active' : ''}`}
                 stroke={index === selected ? 'url(#preflight-turn-gradient)' : undefined} />)}
               {guide.corners.map((corner, index) => <g key={corner.number} className={`preflight-corner${index === selected ? ' active' : ''}`}
-                onClick={() => { setSelected(index); seek(corner.startIndex / 1200) }} role="button" aria-label={`Select corner ${corner.number}`}>
-                <circle cx={corner.points.apex.x} cy={corner.points.apex.y} r={index === selected ? 18 : 14} className="preflight-corner-hit" />
-                {index !== selected && <text x={cornerLabels[index].x} y={cornerLabels[index].y} textAnchor="middle" dominantBaseline="central">{corner.number}</text>}
+                onClick={() => {
+                  if (suppressClick.current) return
+                  setSelected(index)
+                  seek(corner.startIndex / 1200)
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
+                    setSelected(index)
+                    seek(corner.startIndex / 1200)
+                  }
+                }}
+                role="button" tabIndex={0} aria-label={`Select corner ${corner.number}`}>
+                <rect x={cornerLabels[index].x - 14} y={cornerLabels[index].y - 14} width="28" height="28" className="preflight-corner-hit" />
+                <text x={cornerLabels[index].x} y={cornerLabels[index].y} textAnchor="middle" dominantBaseline="central">{corner.number}</text>
               </g>)}
               <g transform={`translate(${carPoint.x} ${carPoint.y}) rotate(${carPoint.heading})`} className="preflight-car">
                 <circle r="13" />

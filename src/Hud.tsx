@@ -139,16 +139,17 @@ function tireColor(temperature: number) {
   return '#ff3b30'
 }
 
-function TireTile({ label, x, y, pressure, temperature }: { label: string; x: number; y: number; pressure?: number; temperature?: number }) {
+function TireTile({ x, y, pressure, temperature, align }: { x: number; y: number; pressure?: number; temperature?: number; align: 'left' | 'right' }) {
   const color = temperature == null ? '#465052' : tireColor(temperature)
-  const barWidth = temperature == null ? 0 : Math.max(2, Math.min(42, (temperature - 40) / 80 * 42))
+  const barHeight = temperature == null ? 0 : Math.max(2, Math.min(38, (temperature - 40) / 80 * 38))
+  const barX = align === 'left' ? x + 2 : x + 36
+  const textX = align === 'left' ? x + 12 : x + 30
   return <g>
-    <rect x={x} y={y} width="78" height="34" rx="5" className="hud-tire-tile" />
-    <text x={x + 7} y={y + 12} className="hud-tire-label">{label}</text>
-    <rect x={x + 30} y={y + 6} width="42" height="5" rx="2.5" className="hud-tire-temp-bg" />
-    <rect x={x + 30} y={y + 6} width={barWidth} height="5" rx="2.5" fill={color} />
-    <text x={x + 7} y={y + 26} className="hud-tire-pressure">{pressure == null ? '—' : pressure.toFixed(1)} PSI</text>
-    {temperature != null && <title>{label}: {temperature.toFixed(0)}°C core temperature</title>}
+    <rect x={barX} y={y + 3} width="6" height="40" rx="3" className="hud-tire-temp-bg" />
+    {barHeight > 0 && <rect x={barX} y={y + 43 - barHeight} width="6" height={barHeight} rx="3" fill={color} />}
+    <text x={textX} y={y + 24} textAnchor={align === 'left' ? 'start' : 'end'} className="hud-tire-pressure">{pressure == null ? '—' : pressure.toFixed(1)}</text>
+    <text x={textX} y={y + 34} textAnchor={align === 'left' ? 'start' : 'end'} className="hud-tire-unit">PSI</text>
+    {temperature != null && <title>{temperature.toFixed(0)}°C core temperature</title>}
   </g>
 }
 
@@ -186,8 +187,9 @@ export function HudGauge({ frame, showReference = true }: { frame: LiveFrame | n
         {Array.from({ length: 10 }, (_, index) => <rect key={index} x={105 + index * 9} y="13" width="7" height="4" rx="1"
           className={index < fuelBlocks ? (fuel < 10 ? 'hud-fuel-block low' : 'hud-fuel-block filled') : 'hud-fuel-block'} />)}
       </>}
-      {tyres && [0, 1, 2, 3].map((index) => <TireTile key={index} label={['FL', 'FR', 'RL', 'RR'][index]}
-        x={index % 2 === 0 ? 8 : 214} y={index < 2 ? 22 : 244}
+      {tyres && [0, 1, 2, 3].map((index) => <TireTile key={index}
+        x={index % 2 === 0 ? 6 : 250} y={index < 2 ? 32 : 218}
+        align={index % 2 === 0 ? 'left' : 'right'}
         pressure={tyres.pressuresPsi[index]} temperature={tyres.coreTempsC[index]} />)}
     </> : <>
       <path d={arc('left', 1, RING)} className="hud-arc-bg" />
