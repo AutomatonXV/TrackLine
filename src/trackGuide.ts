@@ -43,7 +43,7 @@ const CORNER_THRESHOLD = 0.22
 const MERGE_GAP = 8
 const MARKER_APPROACH = 14
 const MARKER_TURN_IN = 4
-const MAP_WIDTH_VISUAL_SCALE = 2.2
+const MAP_WIDTH_VISUAL_SCALE = 2.8
 
 const wrap = (index: number, length: number) => ((index % length) + length) % length
 const distance = (a: GuidePoint, b: GuidePoint) => Math.hypot(b.x - a.x, b.y - a.y)

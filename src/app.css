@@ -107,8 +107,8 @@
 .preflight-road { fill: #3a4544; stroke: none; }
 .preflight-boundary { fill: none; stroke: #c0ccc5; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
 .preflight-center { fill: none; stroke: #75827d; stroke-width: 2; stroke-dasharray: 4 5; stroke-linecap: round; stroke-linejoin: round; }
-.preflight-racing-line, .preflight-racing-line-active { fill: none; stroke-width: 9; stroke-linecap: round; stroke-linejoin: round; opacity: .98; pointer-events: none; }
-.preflight-racing-line-active { stroke: #ef4e50; stroke-width: 13; opacity: 0; }
+.preflight-racing-line, .preflight-racing-line-active { fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; opacity: .98; pointer-events: none; }
+.preflight-racing-line-active { stroke: #ef4e50; stroke-width: 4; opacity: 0; }
 .preflight-racing-line-active.active { opacity: .98; }
 .preflight-corner { cursor: pointer; }
 .preflight-corner-hit { fill: transparent; stroke: none; pointer-events: all; }
