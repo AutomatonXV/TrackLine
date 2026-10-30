@@ -92,6 +92,7 @@ test('selects the fastest plausible lap and estimates a path from speed and yaw 
     assert.equal(fastest.lapTime, 50)
     assert.equal(fastest.positionSource, 'estimated')
     assert.ok(fastest.samples.some((sample) => sample.x !== 0 && sample.y !== 0))
+    assert.ok(fastest.samples.every((sample) => Number.isFinite(sample.yawRate)))
 
     const laterLap = parseLap(filePath, 1)
     assert.equal(laterLap.lapTime, 120)

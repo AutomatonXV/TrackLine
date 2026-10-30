@@ -9,6 +9,7 @@
     "build": "tsc -b && vite build",
     "test": "node --test",
     "start": "electron .",
+    "generate:gt3-reference": "node scripts/generate-gt3-reference.cjs",
     "dist": "npm run build && electron-builder"
   },
   "dependencies": {
@@ -36,6 +37,7 @@
     "files": [
       "dist/**",
       "electron/**",
+      "src/data/gt3-reference/**",
       "Assets/**",
       "package.json"
     ],

@@ -4,7 +4,7 @@ import nurburgringTrack from './data/tumftm/tracks/nurburgring.csv?raw'
 import monzaLine from './data/tumftm/racelines/monza.csv?raw'
 import spaLine from './data/tumftm/racelines/spa.csv?raw'
 import nurburgringLine from './data/tumftm/racelines/nurburgring.csv?raw'
-import type { RacingLineSearchSpace } from './racingLineOptimizer'
+import { RACING_LINE_SECTOR_COUNT, type RacingLineSearchSpace } from './racingLineOptimizer'
 
 export const GUIDE_TRACKS = ['Monza', 'Spa-Francorchamps', 'Nürburgring GP'] as const
 export type GuideTrack = typeof GUIDE_TRACKS[number]
@@ -131,7 +131,7 @@ function boundaryPoints(centerline: TrackPoint[]) {
   return { left, right }
 }
 
-function fitToMap(centerline: TrackPoint[], left: GuidePoint[], right: GuidePoint[], racingLine: GuidePoint[]) {
+function fitToMap(centerline: TrackPoint[], left: GuidePoint[], right: GuidePoint[], racingLine: GuidePoint[], usableWidth: number) {
   const widen = (point: GuidePoint, center: GuidePoint) => ({
     x: center.x + (point.x - center.x) * MAP_WIDTH_VISUAL_SCALE,
     y: center.y + (point.y - center.y) * MAP_WIDTH_VISUAL_SCALE,
@@ -151,17 +151,31 @@ function fitToMap(centerline: TrackPoint[], left: GuidePoint[], right: GuidePoin
     y: 1000 - offsetY - (point.y - minY) * scale,
   })
   const mappedCenterline = centerline.map(fit)
+  const mappedRacingLine = racingLine.map(fit)
+  const normals = centerline.map((_, index) => {
+    const before = centerline[wrap(index - 1, centerline.length)]
+    const after = centerline[(index + 1) % centerline.length]
+    const length = distance(before, after) || 1
+    return { x: -(after.y - before.y) / length, y: -(after.x - before.x) / length }
+  })
+  const leftLimit = centerline.map((point) => point.leftWidth * scale * usableWidth)
+  const rightLimit = centerline.map((point) => point.rightWidth * scale * usableWidth)
+  const initialOffsets = Array.from({ length: RACING_LINE_SECTOR_COUNT }, (_, sector) => {
+    const index = Math.round(sector * centerline.length / RACING_LINE_SECTOR_COUNT) % centerline.length
+    const deltaX = mappedRacingLine[index].x - mappedCenterline[index].x
+    const deltaY = mappedRacingLine[index].y - mappedCenterline[index].y
+    const lateral = deltaX * normals[index].x + deltaY * normals[index].y
+    const limit = lateral >= 0 ? leftLimit[index] : rightLimit[index]
+    return Math.max(-0.88, Math.min(0.88, lateral / Math.max(limit, 1e-9)))
+  })
   const optimizer: RacingLineSearchSpace = {
     center: mappedCenterline,
-    normals: centerline.map((_, index) => {
-      const before = centerline[wrap(index - 1, centerline.length)]
-      const after = centerline[(index + 1) % centerline.length]
-      const length = distance(before, after) || 1
-      return { x: -(after.y - before.y) / length, y: -(after.x - before.x) / length }
-    }),
-    leftLimit: centerline.map((point) => point.leftWidth * scale * 0.88),
-    rightLimit: centerline.map((point) => point.rightWidth * scale * 0.88),
+    normals,
+    leftLimit,
+    rightLimit,
     metersPerMapUnit: 1 / scale,
+    initialOffsets,
+    displayWidthScale: MAP_WIDTH_VISUAL_SCALE,
   }
   return {
     centerline: mappedCenterline,
@@ -247,7 +261,7 @@ function guideFor(track: GuideTrack): TrackGuide {
   const centerline = resampleTrack(rawCenterline)
   const racingLine = resampleRacingLine(rawRacingLine)
   const bounds = boundaryPoints(centerline)
-  const fitted = fitToMap(centerline, bounds.left, bounds.right, racingLine)
+  const fitted = fitToMap(centerline, bounds.left, bounds.right, racingLine, track === 'Monza' ? 0.92 : 0.88)
   const sampleSpacing = pathLength(racingLine) / SAMPLE_COUNT
   const groups = findCorners(localTurns(racingLine), sampleSpacing)
   const corners: GuideCorner[] = groups.map((corner, index) => {

@@ -289,6 +289,7 @@ function parseLap(filePath, requestedLapIndex) {
       distance: Math.max(0, travelled), time: lapSeconds, speed: currentSpeed,
       throttle: throttle ? valueAt(throttle.values, ratio) : 0,
       brake: brake ? valueAt(brake.values, ratio) : 0,
+      yawRate: yawRate ? valueAt(yawRate.values, ratio) : null,
       x, y,
     })
     previousTime = lapSeconds

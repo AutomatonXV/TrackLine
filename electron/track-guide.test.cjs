@@ -11,6 +11,7 @@ test('generates finite corner and racing-line guidance for every bundled circuit
   })
   try {
     const { getTrackGuide, GUIDE_TRACKS } = await server.ssrLoadModule('/src/trackGuide.ts')
+    const { createRacingLineOptimizer } = await server.ssrLoadModule('/src/racingLineOptimizer.ts')
     const expectedLength = {
       Monza: [5700, 5900],
       'Spa-Francorchamps': [6900, 7100],
@@ -52,6 +53,26 @@ test('generates finite corner and racing-line guidance for every bundled circuit
         }
       }
     }
+
+    const space = getTrackGuide('Monza').optimizer
+    const baselineOptimizer = createRacingLineOptimizer(space, 17)
+    const telemetry = {
+      speedMps: Array(480).fill(50),
+      throttlePercent: Array(480).fill(100),
+      brakePercent: Array(480).fill(0),
+      lateralAccelerationMps2: Array(480).fill(13),
+      longitudinalAccelerationMps2: Array(480).fill(4),
+    }
+    const calibratedOptimizer = createRacingLineOptimizer(space, 17, telemetry)
+    for (let iteration = 0; iteration < 48; iteration += 1) {
+      baselineOptimizer.step()
+      calibratedOptimizer.step()
+    }
+    const baseline = baselineOptimizer.current()
+    const calibrated = calibratedOptimizer.current()
+    assert.ok(calibrated.estimatedLapSeconds < baseline.estimatedLapSeconds)
+    assert.ok(calibrated.speedsKmh.every(Number.isFinite))
+    assert.notDeepEqual(calibrated.line, baseline.line)
   } finally {
     await server.close()
   }

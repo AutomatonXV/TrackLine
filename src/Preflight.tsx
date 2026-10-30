@@ -2,12 +2,13 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import { CornerUpLeft, CornerUpRight, Flag, Map, MoveUpRight, RotateCcw, RotateCw, ZoomIn, ZoomOut } from 'lucide-react'
 import { getTrackGuide, GUIDE_TRACKS, type GuideCorner, type GuidePoint, type GuideTrack } from './trackGuide'
-import { createRacingLineOptimizer, type RacingLineProgress } from './racingLineOptimizer'
+import { createRacingLineOptimizer, type RacingLineProgress, type RacingLineTelemetry } from './racingLineOptimizer'
 
 const pointString = (points: GuidePoint[]) => points.map(({ x, y }) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ')
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value))
 const trackSeed = (track: string) => [...track].reduce((seed, character) => (seed * 31 + character.charCodeAt(0)) >>> 0, 7)
 const lapTime = (seconds: number) => `${Math.floor(seconds / 60)}:${(seconds % 60).toFixed(1).padStart(4, '0')}`
+const MONZA_REFERENCE_FILE = 'monza-nissan_gt_r_gt3_2018-5-2026.10.13-14.14.06.ld'
 
 function advice(corner: GuideCorner) {
   if (corner.character === 'tight') {
@@ -19,8 +20,12 @@ function advice(corner: GuideCorner) {
   return 'Protect momentum with one smooth arc. Use only the lift or braking needed for confidence, avoid a second steering correction, and let the car flow to the exit.'
 }
 
-function speedColor(speed: number, min: number, max: number) {
-  const amount = clamp((speed - min) / Math.max(1, max - min), 0, 1)
+function accelerationColor(acceleration: number) {
+  const amount = acceleration < -0.5
+    ? 0.5 * (1 - clamp((-acceleration - 0.5) / 7.5, 0, 1))
+    : acceleration > 0.5
+      ? 0.5 + 0.5 * clamp((acceleration - 0.5) / 4, 0, 1)
+      : 0.5
   const red = [239, 78, 80]
   const yellow = [240, 173, 80]
   const green = [52, 199, 89]
@@ -30,29 +35,83 @@ function speedColor(speed: number, min: number, max: number) {
   return `rgb(${start.map((value, index) => Math.round(value + (end[index] - value) * blend)).join(',')})`
 }
 
+function pedalColor(brake: number, throttle: number) {
+  const amber = [240, 173, 80]
+  const end = brake > 2 ? [239, 78, 80] : throttle > 3 ? [52, 199, 89] : amber
+  const amount = brake > 2 ? clamp(brake / 100, 0, 1) : throttle > 3 ? clamp(throttle / 100, 0, 1) : 0
+  return `rgb(${amber.map((value, index) => Math.round(value + (end[index] - value) * amount)).join(',')})`
+}
+
+function prepareTelemetry(samples: LapSample[]): RacingLineTelemetry {
+  const firstDistance = samples[0].distance
+  const lastDistance = samples[samples.length - 1].distance
+  const uniform = Array.from({ length: 480 }, (_, index) => {
+    const target = firstDistance + (lastDistance - firstDistance) * index / 479
+    let upper = 1
+    while (upper < samples.length - 1 && samples[upper].distance < target) upper += 1
+    const lower = upper - 1
+    const first = samples[lower]
+    const second = samples[upper]
+    const amount = clamp((target - first.distance) / Math.max(0.000001, second.distance - first.distance), 0, 1)
+    const mix = (a: number, b: number) => a + (b - a) * amount
+    return {
+      time: mix(first.time, second.time),
+      speed: mix(first.speed, second.speed),
+      throttle: mix(first.throttle, second.throttle),
+      brake: mix(first.brake, second.brake),
+      yawRate: first.yawRate == null || second.yawRate == null ? 0 : mix(first.yawRate, second.yawRate),
+    }
+  })
+  return {
+    speedMps: uniform.map((sample) => sample.speed),
+    throttlePercent: uniform.map((sample) => clamp(sample.throttle, 0, 100)),
+    brakePercent: uniform.map((sample) => clamp(sample.brake, 0, 100)),
+    lateralAccelerationMps2: uniform.map((sample) => Math.abs(sample.speed * sample.yawRate)),
+    longitudinalAccelerationMps2: uniform.map((_, index) => {
+      const before = uniform[Math.max(0, index - 1)]
+      const after = uniform[Math.min(uniform.length - 1, index + 1)]
+      const elapsed = after.time - before.time
+      return elapsed > 0 ? (after.speed - before.speed) / elapsed : 0
+    }),
+  }
+}
+
 export default function Preflight() {
   const [track, setTrack] = useState<GuideTrack>('Monza')
   const [selected, setSelected] = useState(0)
   const [zoom, setZoom] = useState(1)
   const [rotation, setRotation] = useState(0)
   const [pan, setPan] = useState({ x: 0, y: 0 })
-  const [optimization, setOptimization] = useState<{ track: GuideTrack; result: RacingLineProgress } | null>(null)
+  const [optimization, setOptimization] = useState<{
+    optimizer: ReturnType<typeof createRacingLineOptimizer>
+    result: RacingLineProgress
+  } | null>(null)
+  const [motecReference, setMotecReference] = useState<{ name: string; lapTime: number; telemetry: RacingLineTelemetry } | null>(null)
+  const [motecStatus, setMotecStatus] = useState('Looking for the Monza MoTeC reference…')
   const mapDrag = useRef<{ x: number; y: number; ox: number; oy: number; moved: boolean } | null>(null)
   const suppressClick = useRef(false)
   const guide = useMemo(() => getTrackGuide(track), [track])
-  const optimizer = useMemo(() => createRacingLineOptimizer(guide.optimizer, trackSeed(track)), [guide, track])
-  const currentOptimization = optimization?.track === track ? optimization.result : optimizer.current()
+  const trackTelemetry = track === 'Monza' ? motecReference : null
+  const optimizer = useMemo(() => createRacingLineOptimizer(
+    guide.optimizer,
+    trackSeed(track),
+    trackTelemetry?.telemetry,
+  ), [guide, track, trackTelemetry])
+  const currentOptimization = optimization?.optimizer === optimizer ? optimization.result : optimizer.current()
   const racingSegments = useMemo(() => {
-    const minSpeed = Math.min(...currentOptimization.speedsKmh)
-    const maxSpeed = Math.max(...currentOptimization.speedsKmh)
     return currentOptimization.line.map((point, index) => {
       const next = currentOptimization.line[(index + 1) % currentOptimization.line.length]
+      const telemetryIndex = trackTelemetry
+        ? Math.round(index / Math.max(1, currentOptimization.line.length - 1) * (trackTelemetry.telemetry.brakePercent.length - 1))
+        : 0
       return {
-        color: speedColor(currentOptimization.speedsKmh[index], minSpeed, maxSpeed),
+        color: trackTelemetry
+          ? pedalColor(trackTelemetry.telemetry.brakePercent[telemetryIndex], trackTelemetry.telemetry.throttlePercent[telemetryIndex])
+          : accelerationColor(currentOptimization.accelerationsMps2[index]),
         points: `${point.x.toFixed(1)},${point.y.toFixed(1)} ${next.x.toFixed(1)},${next.y.toFixed(1)}`,
       }
     })
-  }, [currentOptimization])
+  }, [currentOptimization, trackTelemetry])
   const candidatePoints = useMemo(() => pointString(currentOptimization.candidate), [currentOptimization])
   const mapGeometry = useMemo(() => ({
     road: pointString([...guide.leftEdge, ...guide.rightEdge.slice().reverse()]),
@@ -81,6 +140,36 @@ export default function Preflight() {
   }, [guide])
   const active = guide.corners[selected] ?? guide.corners[0]
 
+  useEffect(() => {
+    let active = true
+    const loadReference = async () => {
+      try {
+        const library = await window.fastrack.library()
+        const summary = library.find((lap) => !lap.error && lap.name.toLowerCase() === MONZA_REFERENCE_FILE)
+        if (!summary) {
+          if (active) setMotecStatus(`MoTeC reference not found: ${MONZA_REFERENCE_FILE}`)
+          return
+        }
+        const lap = await window.fastrack.loadLap(summary.path, summary.fastestLapIndex ?? 0)
+        if (!lap.hasThrottle || !lap.hasBrake || lap.samples.length < 30) {
+          throw new Error('The fastest lap is missing usable throttle, brake, or distance samples.')
+        }
+        const telemetry = prepareTelemetry(lap.samples)
+        if (active) {
+          setMotecReference({ name: lap.name, lapTime: lap.lapTime, telemetry })
+          setMotecStatus(`MoTeC fastest lap · ${lapTime(lap.lapTime)}`)
+        }
+      } catch (error) {
+        if (active) {
+          const message = error instanceof Error ? error.message : String(error)
+          setMotecStatus(`MoTeC reference unavailable · ${message}`)
+        }
+      }
+    }
+    void loadReference()
+    return () => { active = false }
+  }, [])
+
   const chooseTrack = (next: GuideTrack) => {
     setTrack(next)
     setSelected(0)
@@ -90,10 +179,10 @@ export default function Preflight() {
   }
 
   useEffect(() => {
-    setOptimization({ track, result: optimizer.current() })
+    setOptimization({ optimizer, result: optimizer.current() })
     const timer = window.setInterval(() => {
       const result = optimizer.step()
-      setOptimization({ track, result })
+      setOptimization({ optimizer, result })
       if (result.complete) window.clearInterval(timer)
     }, 75)
     return () => window.clearInterval(timer)
@@ -143,8 +232,9 @@ export default function Preflight() {
         <div className="preflight-map-title">
           <span>{track}</span>
           <small>{guide.corners.length} turns · {guide.lengthMeters.toFixed(0)} m</small>
+          <small className={`preflight-telemetry-status${motecReference ? ' active' : ''}`} aria-live="polite">{motecStatus}</small>
           <small className="preflight-optimizer-status" aria-live="polite">
-            {currentOptimization.complete ? 'OPTIMIZED' : 'OPTIMIZING'} · {currentOptimization.iteration}/{currentOptimization.totalIterations}
+            {currentOptimization.complete ? 'REFINED' : 'OPTIMIZING'} · {currentOptimization.iteration}/{currentOptimization.totalIterations}
             {' · '}score {lapTime(currentOptimization.estimatedLapSeconds)}
           </small>
         </div>
@@ -190,10 +280,12 @@ export default function Preflight() {
           <span className="preflight-wheel-hint">Drag to pan · Scroll to zoom · Use arrows to rotate</span>
         </div>
         <div className="preflight-line-legend">
-          <span className="brake-color">Slower</span><i /><span className="accelerate-color">Faster</span>
-          <span className="line-legend-note">Estimated speed through corners</span>
+          <span className="brake-color">{motecReference ? 'Logged braking' : 'Braking'}</span><i /><span className="accelerate-color">{motecReference ? 'Logged throttle' : 'Acceleration'}</span>
+          <span className="line-legend-note">Coasting shown in amber</span>
         </div>
-        <p className="preflight-caveat">The line updates as a particle-swarm search tests track-width-constrained paths. Color shows estimated corner speed, not brake or throttle input; lap time is a relative optimization score, not an ACC prediction.</p>
+        <p className="preflight-caveat">{trackTelemetry
+          ? 'The fastest MoTeC lap supplies the pedal colors and calibrates the optimizer from speed, throttle, brake, and yaw-rate data. This log has no GPS position, so the optimized line is not the driver’s exact lateral trace. The lap-time score is relative, not an ACC prediction.'
+          : 'The line updates as a particle-swarm search tests track-width-constrained paths. Color estimates braking, coasting, and acceleration from the speed profile; it is not pedal telemetry. The lap-time score is relative, not an ACC prediction.'}</p>
       </div>
 
       <aside className="preflight-guide">

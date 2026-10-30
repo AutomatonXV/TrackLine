@@ -18,6 +18,7 @@ interface LapSample {
   speed: number
   throttle: number
   brake: number
+  yawRate?: number | null
   x: number | null
   y: number | null
 }
