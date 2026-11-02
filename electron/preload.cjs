@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld('fastrack', {
   importSetup: () => ipcRenderer.invoke('setup:import'),
   clearSetup: () => ipcRenderer.invoke('setup:clear'),
   tuneSetup: (payload) => ipcRenderer.invoke('setup:tune', payload),
+  setupCandidates: (payload) => ipcRenderer.invoke('setup:candidates', payload),
   liveStatus: () => ipcRenderer.invoke('live:status'),
   reconnectAcc: () => ipcRenderer.invoke('live:reconnect'),
   saveLiveSettings: (patch) => ipcRenderer.invoke('live:settings', patch),

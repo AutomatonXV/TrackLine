@@ -4,7 +4,7 @@ const fs = require('node:fs')
 const path = require('node:path')
 const { discoverFiles, parseLap } = require('./telemetry.cjs')
 const { createLive } = require('./live.cjs')
-const { parseSetup, findSetupTemplate, createTuneVariant } = require('./setup.cjs')
+const { parseSetup, findSetupTemplate, listSetups, createTuneVariant } = require('./setup.cjs')
 
 let live = null
 
@@ -125,21 +125,30 @@ app.whenReady().then(() => {
     delete state.setupPath
     writeState(state)
   })
-  ipcMain.handle('setup:tune', (_event, { car, track, answers }) => {
+  function tuneTarget(car, track) {
+    const preferred = readState().setupPath
+    if (car && track) return { car, track, preferred }
+    if (!preferred) throw new Error('Import a setup first (or connect to ACC) so Tune Helper knows the car and track.')
+    const parsed = parseSetup(preferred)
+    return { car: parsed.car, track: parsed.track, preferred }
+  }
+  ipcMain.handle('setup:candidates', (_event, { car, track }) => {
+    try {
+      const target = tuneTarget(car, track)
+      const setupsRoot = setupFolder()
+      const selected = findSetupTemplate({ setupsRoot, car: target.car, track: target.track, preferredPath: target.preferred })
+      return { car: target.car, track: target.track, selectedPath: selected, candidates: listSetups({ setupsRoot, car: target.car, track: target.track }), error: '' }
+    } catch (error) {
+      return { car: car || '', track: track || '', selectedPath: null, candidates: [], error: error.message }
+    }
+  })
+  ipcMain.handle('setup:tune', (_event, { car, track, answers, sourcePath: chosen }) => {
     const state = readState()
     const setupsRoot = setupFolder()
-    const preferred = state.setupPath
-    let targetCar = car
-    let targetTrack = track
-    if (!targetCar || !targetTrack) {
-      if (!preferred) throw new Error('Import a setup first (or connect to ACC) so Tune Helper knows the car and track.')
-      const parsed = parseSetup(preferred)
-      targetCar = parsed.car
-      targetTrack = parsed.track
-    }
-    const sourcePath = findSetupTemplate({ setupsRoot, car: targetCar, track: targetTrack, preferredPath: preferred })
-    if (!sourcePath) throw new Error(`No ACC setup was found for ${targetCar}. Import a setup for this car, then try again.`)
-    const result = createTuneVariant({ sourcePath, setupsRoot, car: targetCar, track: targetTrack, answers })
+    const target = tuneTarget(car, track)
+    const sourcePath = chosen || findSetupTemplate({ setupsRoot, car: target.car, track: target.track, preferredPath: target.preferred })
+    if (!sourcePath) throw new Error(`No ACC setup was found for ${target.car}. Import a setup for this car, then try again.`)
+    const result = createTuneVariant({ sourcePath, setupsRoot, car: target.car, track: target.track, answers })
     state.setupPath = result.setup.path
     writeState(state)
     return result

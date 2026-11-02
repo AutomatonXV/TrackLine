@@ -109,6 +109,14 @@ interface TuneAnswers {
   tyres?: SetupQuizTyres & { frontSpreadC?: number; rearSpreadC?: number }
 }
 
+interface SetupCandidates {
+  car: string
+  track: string
+  selectedPath: string | null
+  candidates: { path: string; name: string; track: string; sameTrack: boolean; modified: number }[]
+  error: string
+}
+
 interface TuneResult {
   setup: SetupSummary
   changes: string[]
@@ -151,6 +159,7 @@ interface Window {
     getSetup: () => Promise<{ setup: SetupSummary | null; error: string }>
     importSetup: () => Promise<SetupSummary | null>
     clearSetup: () => Promise<void>
-    tuneSetup: (payload: { car: string; track: string; answers: TuneAnswers }) => Promise<TuneResult>
+    tuneSetup: (payload: { car: string; track: string; answers: TuneAnswers; sourcePath?: string }) => Promise<TuneResult>
+    setupCandidates: (payload: { car: string; track: string }) => Promise<SetupCandidates>
   }
 }

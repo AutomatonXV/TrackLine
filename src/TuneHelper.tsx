@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { CircleCheck, Upload, X } from 'lucide-react'
 
 type Choice = { value: string; label: string }
@@ -74,8 +74,17 @@ export default function TuneHelper({ car, track, setup, onSetup, onClose }: {
   const [result, setResult] = useState<TuneResult | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [info, setInfo] = useState<SetupCandidates | null>(null)
+  const [sourcePath, setSourcePath] = useState('')
 
-  const target = car && track ? { car, track } : setup ? { car: setup.car, track: setup.track } : null
+  const loadCandidates = async () => {
+    const next = await window.fastrack.setupCandidates({ car, track })
+    setInfo(next)
+    setSourcePath(next.selectedPath ?? '')
+  }
+  useEffect(() => { void loadCandidates() }, [car, track]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const target = info && info.car ? { car: info.car, track: info.track } : null
   const changed = Object.entries(answers).filter(([key, value]) => key !== 'speed' && value !== 'ok').length > 0 || useTyres
   const choose = (key: Question['key'], value: string) =>
     setAnswers((current) => ({ ...current, [key]: current[key] === value ? undefined : value }))
@@ -83,7 +92,7 @@ export default function TuneHelper({ car, track, setup, onSetup, onClose }: {
   const importSetup = async () => {
     try {
       const selected = await window.fastrack.importSetup()
-      if (selected) { onSetup(selected); setError('') }
+      if (selected) { onSetup(selected); setError(''); await loadCandidates() }
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : String(failure))
     }
@@ -108,9 +117,10 @@ export default function TuneHelper({ car, track, setup, onSetup, onClose }: {
     setBusy(true)
     setError('')
     try {
-      const next = await window.fastrack.tuneSetup({ car: target?.car ?? '', track: target?.track ?? '', answers: payload })
+      const next = await window.fastrack.tuneSetup({ car: target?.car ?? '', track: target?.track ?? '', answers: payload, sourcePath: sourcePath || undefined })
       setResult(next)
       onSetup(next.setup)
+      await loadCandidates()
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : String(failure))
     } finally {
@@ -143,6 +153,15 @@ export default function TuneHelper({ car, track, setup, onSetup, onClose }: {
         <p className="feedback-session">{target ? `${target.car} · ${target.track}` : 'No car selected'}</p>
         <p>Answer what you felt. Each answer maps to one conservative click, based on the ACC setup guides. A new copy is saved and your original stays untouched. Opposite answers cancel out.</p>
         {!target && <p className="live-warn">Import a setup (or connect to ACC) so Tune Helper knows the car and track.</p>}
+        <div className="tune-base">
+          <span className="tune-sub">BASE SETUP — WE COPY AND IMPROVE THIS ONE</span>
+          {info && info.candidates.length > 0 ? <select value={sourcePath} onChange={(event) => setSourcePath(event.target.value)}>
+            {info.candidates.map((entry) => <option key={entry.path} value={entry.path}>
+              {entry.name} · {entry.track}{entry.sameTrack ? '' : ' (other track)'} · {new Date(entry.modified).toLocaleString()}
+            </option>)}
+          </select> : <p className="live-warn">{info?.error || 'No ACC setup found for this car. Import one below.'}</p>}
+          <small>ACC does not report which setup is loaded, so the newest one for this car and track is preselected. Pick the one you are driving, or import a file. TrackLine-made copies appear here too, so tuning again builds on your last copy.</small>
+        </div>
         {sections.map((section) => <div key={section.title} className="tune-section">
           <h3>{section.title}</h3>
           <p className="tune-caption">{section.caption}</p>

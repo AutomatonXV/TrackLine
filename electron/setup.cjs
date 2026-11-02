@@ -386,4 +386,18 @@ function createTuneVariant({ sourcePath, setupsRoot, car, track, answers, now = 
   return { setup: parseSetup(destination), changes, skipped, advice }
 }
 
-module.exports = { ISSUES, CHOICES, parseSetup, findSetupTemplate, createSetupVariant, createTuneVariant, trackMatches }
+function listSetups({ setupsRoot, car, track }) {
+  const carFolder = carFolderFor(setupsRoot, car)
+  if (!carFolder) return []
+  const result = []
+  for (const filePath of setupFilesIn(path.join(setupsRoot, carFolder))) {
+    try {
+      if (normalize(readDocument(filePath).carName) !== normalize(car)) continue
+      const trackName = path.basename(path.dirname(filePath))
+      result.push({ path: filePath, name: path.basename(filePath), track: trackName, sameTrack: trackMatches(trackName, track), modified: fs.statSync(filePath).mtimeMs })
+    } catch { /* ignore unreadable or non-setup JSON */ }
+  }
+  return result.sort((a, b) => Number(b.sameTrack) - Number(a.sameTrack) || b.modified - a.modified)
+}
+
+module.exports = { ISSUES, CHOICES, parseSetup, findSetupTemplate, listSetups, createSetupVariant, createTuneVariant, trackMatches }

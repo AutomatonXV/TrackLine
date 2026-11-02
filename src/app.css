@@ -30,6 +30,10 @@
 .preflight-toggle.active { border-color: #8ab4a8; background: rgba(138, 180, 168, .18); color: #d7eee5; }
 .live { position: relative; }
 .live-bar { display: flex; gap: 6px; }
+.tune-base { display: flex; flex-direction: column; gap: 6px; margin: 12px 0; padding: 12px; border: 1px solid #43524f; border-radius: 10px; background: rgba(0,0,0,.18); }
+.tune-base select { padding: 7px; border: 1px solid var(--line); border-radius: 6px; background: #101314; color: inherit; font-size: 11px; }
+.tune-base small { color: var(--muted); font-size: 10px; line-height: 1.4; }
+.tune-base .tune-sub { margin: 0; }
 .tune-card { width: min(720px, 94vw); }
 .tune-section { margin: 14px 0; padding-top: 12px; border-top: 1px solid var(--line); }
 .tune-section h3 { margin: 0 0 3px; font-size: 14px; }
