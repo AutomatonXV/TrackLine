@@ -217,6 +217,11 @@ function createSetupVariant({ sourcePath, setupsRoot, car, track, issue, tyres, 
   }
 
   const change = recommendation.apply(setup, tyres)
+  const destination = writeVariant({ setup, setupsRoot, car, track, tag: issue, now })
+  return { setup: parseSetup(destination), issue: recommendation.label, description: recommendation.description, change }
+}
+
+function writeVariant({ setup, setupsRoot, car, track, tag, now }) {
   const carFolder = carFolderFor(setupsRoot, car) || setup.carName
   const existingTrackFolder = fs.existsSync(path.join(setupsRoot, carFolder))
     ? fs.readdirSync(path.join(setupsRoot, carFolder), { withFileTypes: true })
@@ -226,7 +231,7 @@ function createSetupVariant({ sourcePath, setupsRoot, car, track, issue, tyres, 
   fs.mkdirSync(destinationFolder, { recursive: true })
 
   const stamp = now.toISOString().replace(/[:.]/g, '-').replace('T', '-').replace('Z', '')
-  const baseName = `TrackLine-${issue}-${stamp}`
+  const baseName = `TrackLine-${tag}-${stamp}`
   let destination = path.join(destinationFolder, `${baseName}.json`)
   let suffix = 2
   while (fs.existsSync(destination)) {
@@ -234,7 +239,151 @@ function createSetupVariant({ sourcePath, setupsRoot, car, track, issue, tyres, 
     suffix += 1
   }
   fs.writeFileSync(destination, `${JSON.stringify(setup, null, 2)}\n`, { flag: 'wx' })
-  return { setup: parseSetup(destination), issue: recommendation.label, description: recommendation.description, change }
+  return destination
 }
 
-module.exports = { ISSUES, parseSetup, findSetupTemplate, createSetupVariant, trackMatches }
+const CHOICES = {
+  entry: ['understeer', 'oversteer', 'ok'],
+  mid: ['understeer', 'oversteer', 'ok'],
+  exit: ['understeer', 'oversteer', 'ok'],
+  speed: ['low', 'high', 'both'],
+  braking: ['ok', 'rearLocks', 'frontLocks'],
+  brakeTemp: ['ok', 'hot', 'cold'],
+  kerbs: ['ok', 'unsettled', 'bottoming'],
+  straights: ['ok', 'draggy', 'needsDownforce'],
+}
+
+// Each rule is a single click toward the behaviour described in the ACC setup guides
+// (Patagonia Sim Racing parameter reference, Trinacria Sim Racing beginner guide).
+function planTune(answers) {
+  const plan = new Map()
+  const advice = []
+  const push = (key, delta, reason) => {
+    const entry = plan.get(key) || { delta: 0, reasons: [] }
+    entry.delta += delta
+    entry.reasons.push(reason)
+    plan.set(key, entry)
+  }
+  const highSpeed = answers.speed === 'high'
+  const lowSpeed = answers.speed === 'low'
+
+  if (answers.entry === 'understeer') {
+    push('aRBFront', -1, 'entry understeer')
+    push('brakeBias', -1, 'entry understeer')
+  } else if (answers.entry === 'oversteer') {
+    push('aRBFront', 1, 'entry oversteer')
+    push('brakeBias', 1, 'entry oversteer')
+  }
+
+  if (answers.mid === 'understeer') {
+    push('aRBFront', -1, 'mid-corner understeer')
+    if (highSpeed) push('rearWing', -1, 'high-speed understeer')
+    if (lowSpeed) advice.push('Low-speed understeer: try 1–2 clicks more front toe-out and a softer front wheel rate in the in-game editor.')
+  } else if (answers.mid === 'oversteer') {
+    push('aRBRear', -1, 'mid-corner oversteer')
+    if (highSpeed) push('rearWing', 1, 'high-speed oversteer')
+    if (lowSpeed) advice.push('Low-speed oversteer: try a little more rear toe-in in the in-game editor.')
+  }
+
+  if (answers.exit === 'understeer') {
+    push('aRBRear', 1, 'exit understeer')
+    push('preload', -1, 'exit understeer')
+  } else if (answers.exit === 'oversteer') {
+    push('preload', 1, 'exit oversteer')
+    push('aRBRear', -1, 'exit oversteer')
+    advice.push('If the rear still snaps on throttle, raise traction control one step (TC1) rather than adding more diff preload.')
+  }
+
+  if (answers.braking === 'rearLocks') push('brakeBias', 1, 'rear locks or is unstable under braking')
+  else if (answers.braking === 'frontLocks') push('brakeBias', -1, 'front locks under braking')
+
+  if (answers.brakeTemp === 'hot') push('brakeDuct', 1, 'brakes overheating')
+  else if (answers.brakeTemp === 'cold') push('brakeDuct', -1, 'brakes too cold')
+
+  if (answers.kerbs === 'unsettled') {
+    push('bumpFast', -1, 'unsettled over kerbs')
+    advice.push('Car unsettled over kerbs: softer fast bump helps; also try softer bump-stop rate.')
+  } else if (answers.kerbs === 'bottoming') {
+    advice.push('Scraping or bottoming out: raise ride height by one click on the affected axle and/or add bump-stop range. This is not auto-applied because ride-height clicks are car-specific.')
+  }
+
+  if (answers.straights === 'draggy') push('rearWing', -1, 'too slow on the straights')
+  else if (answers.straights === 'needsDownforce') push('rearWing', 1, 'needs more downforce')
+
+  return { plan, advice }
+}
+
+const KNOBS = {
+  aRBFront: { label: 'Front anti-roll bar', get: (s) => s.advancedSetup?.mechanicalBalance, key: 'aRBFront', max: 20 },
+  aRBRear: { label: 'Rear anti-roll bar', get: (s) => s.advancedSetup?.mechanicalBalance, key: 'aRBRear', max: 20 },
+  brakeBias: { label: 'Brake bias (+ = forward)', get: (s) => s.advancedSetup?.mechanicalBalance, key: 'brakeBias', max: 100 },
+  preload: { label: 'Differential preload', get: (s) => s.advancedSetup?.drivetrain, key: 'preload', max: 20 },
+  rearWing: { label: 'Rear wing', get: (s) => s.advancedSetup?.aeroBalance, key: 'rearWing', max: 20 },
+  brakeDuct: { label: 'Brake ducts (front & rear)', get: (s) => s.advancedSetup?.aeroBalance, key: 'brakeDuct', max: 6, array: true },
+  bumpFast: { label: 'Fast bump damping (all corners)', get: (s) => s.advancedSetup?.dampers, key: 'bumpFast', max: 40, array: true },
+}
+
+function applyKnob(setup, name, delta) {
+  const knob = KNOBS[name]
+  const holder = knob.get(setup)
+  const current = holder?.[knob.key]
+  const values = Array.isArray(current) ? current : [current]
+  if (!holder || values.length === 0 || !values.every((value) => Number.isInteger(value) && value >= 0)) {
+    return { applied: false, note: `${knob.label}: not present in this setup, skipped` }
+  }
+  const next = values.map((value) => Math.max(0, Math.min(knob.max, value + delta)))
+  if (next.every((value, index) => value === values[index])) {
+    return { applied: false, note: `${knob.label}: already at its safe limit, skipped` }
+  }
+  holder[knob.key] = Array.isArray(current) ? next : next[0]
+  return { applied: true, note: `${knob.label} ${delta > 0 ? '+' : ''}${delta} click${Math.abs(delta) === 1 ? '' : 's'}` }
+}
+
+function createTuneVariant({ sourcePath, setupsRoot, car, track, answers, now = new Date() }) {
+  if (!answers || typeof answers !== 'object') throw new Error('Answer at least one question first.')
+  for (const [key, options] of Object.entries(CHOICES)) {
+    if (answers[key] !== undefined && !options.includes(answers[key])) throw new Error(`Unsupported answer for ${key}.`)
+  }
+  const setup = readDocument(sourcePath)
+  if (normalize(setup.carName) !== normalize(car)) {
+    throw new Error('The selected setup is for a different car. Choose a setup for the car you want to tune.')
+  }
+  if (!/^[a-z0-9_-]+$/i.test(car) || !/^[a-z0-9_-]+$/i.test(track)) {
+    throw new Error('ACC car and track identifiers are not safe setup-folder names.')
+  }
+
+  const { plan, advice } = planTune(answers)
+  const changes = []
+  const skipped = []
+  for (const [name, { delta, reasons }] of plan) {
+    const net = Math.max(-2, Math.min(2, delta))
+    if (net === 0) {
+      skipped.push(`${KNOBS[name].label}: conflicting answers (${reasons.join(' vs ')}) cancelled out`)
+      continue
+    }
+    const result = applyKnob(setup, name, net)
+    ;(result.applied ? changes : skipped).push(result.applied ? `${result.note} — ${reasons.join(', ')}` : result.note)
+  }
+
+  const tyres = answers.tyres
+  if (tyres) {
+    const pressure = ISSUES.tyrePressure.apply(setup, tyres)
+    changes.push(pressure)
+    if (tyres.temperaturesC.some((value) => value > 100)) advice.push('Tyres are overheating: open the brake ducts a click, check camber/toe and consider a pressure drop only once temperatures are back in 70–100°C.')
+    if (tyres.temperaturesC.some((value) => value < 70)) advice.push('Tyres are below their 70–100°C window: do a longer warm-up before judging grip or pressure.')
+    const spread = (value, limit, axle) => {
+      if (Number.isFinite(value) && value > limit) advice.push(`${axle} tyres run ${value.toFixed(0)}°C hotter on the inside than the outside (limit ${limit}°C): reduce negative camber a little.`)
+      else if (Number.isFinite(value) && value < 0) advice.push(`${axle} outside edge is hotter than the inside: add a little negative camber.`)
+    }
+    spread(tyres.frontSpreadC, 9, 'Front')
+    spread(tyres.rearSpreadC, 5, 'Rear')
+  }
+
+  if (changes.length === 0 && advice.length === 0 && skipped.length === 0) {
+    changes.push('No changes; saved as a baseline copy')
+  }
+  const destination = writeVariant({ setup, setupsRoot, car, track, tag: 'tune', now })
+  return { setup: parseSetup(destination), changes, skipped, advice }
+}
+
+module.exports = { ISSUES, CHOICES, parseSetup, findSetupTemplate, createSetupVariant, createTuneVariant, trackMatches }

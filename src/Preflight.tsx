@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import { CornerUpLeft, CornerUpRight, Flag, Map, MoveUpRight, RotateCcw, RotateCw, ZoomIn, ZoomOut } from 'lucide-react'
-import { getTrackGuide, GUIDE_TRACKS, type GuideCorner, type GuidePoint, type GuideTrack } from './trackGuide'
+import { getTrackGuide, GUIDE_TRACKS, optimizerSeed, type GuideCorner, type GuidePoint, type GuideTrack } from './trackGuide'
 import { createRacingLineOptimizer, type RacingLineProgress, type RacingLineTelemetry } from './racingLineOptimizer'
 
 const pointString = (points: GuidePoint[]) => points.map(({ x, y }) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ')
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value))
-const trackSeed = (track: string) => [...track].reduce((seed, character) => (seed * 31 + character.charCodeAt(0)) >>> 0, 7)
+const trackSeed = optimizerSeed
 const lapTime = (seconds: number) => `${Math.floor(seconds / 60)}:${(seconds % 60).toFixed(1).padStart(4, '0')}`
 const MONZA_REFERENCE_FILE = 'monza-nissan_gt_r_gt3_2018-5-2026.10.13-14.14.06.ld'
 
@@ -24,7 +24,7 @@ function accelerationColor(acceleration: number) {
   const amount = acceleration < -0.5
     ? 0.5 * (1 - clamp((-acceleration - 0.5) / 7.5, 0, 1))
     : acceleration > 0.5
-      ? 0.5 + 0.5 * clamp((acceleration - 0.5) / 4, 0, 1)
+      ? 0.5 + 0.5 * clamp((acceleration - 0.5) / 3, 0, 1)
       : 0.5
   const red = [239, 78, 80]
   const yellow = [240, 173, 80]

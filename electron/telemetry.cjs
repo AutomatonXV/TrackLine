@@ -70,6 +70,25 @@ function trackLength(track) {
   if (normalized.includes('monza')) return 5793
   if (normalized.includes('paul ricard')) return 5842
   if (normalized.includes('nurburgring')) return 5148
+  if (normalized.includes('donington')) return 4020
+  if (normalized.includes('imola')) return 4909
+  if (normalized.includes('kyalami')) return 4580
+  if (normalized.includes('laguna')) return 3602
+  if (normalized.includes('misano')) return 4200
+  if (normalized.includes('panorama') || normalized.includes('bathurst')) return 6213
+  if (normalized.includes('oulton')) return 4333
+  if (normalized.includes('snetterton')) return 4779
+  if (normalized.includes('valencia') || normalized.includes('tormo')) return 4005
+  if (normalized.includes('watkins')) return 5552
+  if (normalized.includes('zolder')) return 4010
+  if (normalized.includes('cota') || normalized.includes('americas')) return 5513
+  if (normalized.includes('hungaroring')) return 4381
+  if (normalized.includes('barcelona') || normalized.includes('catalunya')) return 4675
+  if (normalized.includes('indianapolis') || normalized.includes('indianpolis')) return 4170
+  if (normalized.includes('silverstone')) return 5890
+  if (normalized.includes('red bull')) return 4318
+  if (normalized.includes('zandvoort')) return 4259
+  if (normalized.includes('suzuka')) return 5807
   return 0
 }
 

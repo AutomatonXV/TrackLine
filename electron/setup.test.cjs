@@ -3,7 +3,7 @@ const fs = require('node:fs')
 const os = require('node:os')
 const path = require('node:path')
 const test = require('node:test')
-const { parseSetup, findSetupTemplate, createSetupVariant } = require('./setup.cjs')
+const { parseSetup, findSetupTemplate, createSetupVariant, createTuneVariant } = require('./setup.cjs')
 
 function nativeSetup(overrides = {}) {
   return {
@@ -41,6 +41,40 @@ test('reads ACC native setup fields without mislabeling car-specific pressure va
       track: 'monza',
       pressureValues: [88, 88, 82, 82],
     })
+  } finally {
+    fs.rmSync(folder, { recursive: true, force: true })
+  }
+})
+
+test('tune helper combines several answers into one new setup and reports advice', () => {
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'trackline-tune-'))
+  try {
+    const sourcePath = writeSetup(folder, 'mclaren_720s_gt3_evo', 'monza', 'base.json', nativeSetup({
+      advancedSetup: {
+        mechanicalBalance: { aRBFront: 8, aRBRear: 6, brakeBias: 40 },
+        dampers: { bumpFast: [0, 2, 4, 0] },
+        aeroBalance: { rearWing: 5, brakeDuct: [2, 2] },
+        drivetrain: { preload: 2 },
+      },
+    }))
+    const original = fs.readFileSync(sourcePath, 'utf8')
+    const result = createTuneVariant({
+      sourcePath, setupsRoot: folder, car: 'mclaren_720s_gt3_evo', track: 'monza',
+      answers: { entry: 'understeer', exit: 'oversteer', mid: 'oversteer', speed: 'high', brakeTemp: 'hot', kerbs: 'unsettled', braking: 'rearLocks' },
+      now: new Date('2026-11-01T20:00:00.000Z'),
+    })
+    const out = JSON.parse(fs.readFileSync(result.setup.path, 'utf8')).advancedSetup
+    assert.equal(out.mechanicalBalance.aRBFront, 7)
+    assert.equal(out.mechanicalBalance.aRBRear, 4)
+    assert.equal(out.mechanicalBalance.brakeBias, 40)
+    assert.ok(result.skipped.some((line) => /Brake bias.*cancelled/.test(line)))
+    assert.equal(out.drivetrain.preload, 3)
+    assert.equal(out.aeroBalance.rearWing, 6)
+    assert.deepEqual(out.aeroBalance.brakeDuct, [3, 3])
+    assert.deepEqual(out.dampers.bumpFast, [0, 1, 3, 0])
+    assert.ok(result.advice.length > 0)
+    assert.equal(fs.readFileSync(sourcePath, 'utf8'), original)
+    assert.throws(() => createTuneVariant({ sourcePath, setupsRoot: folder, car: 'mclaren_720s_gt3_evo', track: 'monza', answers: { entry: 'bogus' } }), /Unsupported/)
   } finally {
     fs.rmSync(folder, { recursive: true, force: true })
   }
@@ -189,3 +223,4 @@ test('rejects unsupported quiz choices and setups for a different car', () => {
     fs.rmSync(folder, { recursive: true, force: true })
   }
 })
+

@@ -253,9 +253,22 @@ class Coach {
   }
 
   update(frame, now = Date.now()) {
-    if (!this.table) return { state: 'noReference' }
     if (frame.status !== 'live') return { state: 'paused' }
     const position = clamp(frame.normalizedCarPosition, 0, 1)
+    if (!this.table) {
+      return {
+        state: 'active',
+        hasReference: false,
+        throttle: { you: clamp(frame.gas * 100, 0, 100), ref: 0 },
+        brake: { you: clamp(frame.brake * 100, 0, 100), ref: 0 },
+        speedKmh: frame.speedKmh || 0,
+        pos: position,
+        lapMs: frame.currentTimeMs || 0,
+        rpm: frame.rpm || 0,
+        maxRpm: frame.maxRpm || 0,
+        gear: Number.isInteger(frame.gear) ? frame.gear : 1,
+      }
+    }
     this.track(frame, position, now)
     const index = position * (this.table.points - 1)
     const throttleRef = sampleAt(this.table.throttle, index)

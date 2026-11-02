@@ -4,7 +4,7 @@ const fs = require('node:fs')
 const path = require('node:path')
 const { discoverFiles, parseLap } = require('./telemetry.cjs')
 const { createLive } = require('./live.cjs')
-const { parseSetup, findSetupTemplate, createSetupVariant } = require('./setup.cjs')
+const { parseSetup, findSetupTemplate, createTuneVariant } = require('./setup.cjs')
 
 let live = null
 
@@ -125,36 +125,24 @@ app.whenReady().then(() => {
     delete state.setupPath
     writeState(state)
   })
-  ipcMain.handle('setup:pending-feedback', () => readState().setupFeedbackQueue[0] || null)
-  ipcMain.handle('setup:submit-feedback', (_event, { sessionId, issue, tyres }) => {
+  ipcMain.handle('setup:tune', (_event, { car, track, answers }) => {
     const state = readState()
-    const feedback = state.setupFeedbackQueue.find((entry) => entry.id === sessionId)
-    if (!feedback) throw new Error('This session feedback has already been completed.')
     const setupsRoot = setupFolder()
-    const sourcePath = findSetupTemplate({
-      setupsRoot,
-      car: feedback.car,
-      track: feedback.track,
-      preferredPath: state.setupPath,
-    })
-    if (!sourcePath) throw new Error(`No ACC setup was found for ${feedback.car}. Import a setup for this car, then try again.`)
-    const result = createSetupVariant({
-      sourcePath,
-      setupsRoot,
-      car: feedback.car,
-      track: feedback.track,
-      issue,
-      tyres,
-    })
+    const preferred = state.setupPath
+    let targetCar = car
+    let targetTrack = track
+    if (!targetCar || !targetTrack) {
+      if (!preferred) throw new Error('Import a setup first (or connect to ACC) so Tune Helper knows the car and track.')
+      const parsed = parseSetup(preferred)
+      targetCar = parsed.car
+      targetTrack = parsed.track
+    }
+    const sourcePath = findSetupTemplate({ setupsRoot, car: targetCar, track: targetTrack, preferredPath: preferred })
+    if (!sourcePath) throw new Error(`No ACC setup was found for ${targetCar}. Import a setup for this car, then try again.`)
+    const result = createTuneVariant({ sourcePath, setupsRoot, car: targetCar, track: targetTrack, answers })
     state.setupPath = result.setup.path
-    state.setupFeedbackQueue = state.setupFeedbackQueue.filter((entry) => entry.id !== sessionId)
     writeState(state)
     return result
-  })
-  ipcMain.handle('setup:dismiss-feedback', (_event, sessionId) => {
-    const state = readState()
-    state.setupFeedbackQueue = state.setupFeedbackQueue.filter((entry) => entry.id !== sessionId)
-    writeState(state)
   })
   ipcMain.handle('preferences:get', () => {
     const state = readState()

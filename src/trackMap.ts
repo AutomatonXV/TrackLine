@@ -1,20 +1,41 @@
 // Places dead-reckoned (speed + yaw rate) traces onto a surveyed track centerline.
 // Centerline and widths: TUMFTM/racetrack-database (LGPL-3.0).
 import monzaRaw from './data/monza-centerline.json'
+import { idealLine, MAP_WIDTH_VISUAL_SCALE, trackCenterlineCsv } from './trackGuide'
 
 export interface Pt { x: number; y: number }
-export interface Fitted { laps: (Pt[] | null)[]; left: Pt[]; right: Pt[]; centre: Pt[]; shift: number }
+export interface Fitted { laps: (Pt[] | null)[]; left: Pt[]; right: Pt[]; centre: Pt[]; shift: number; ideal: () => Pt[] | null }
 
 interface Model { c: Pt[]; nx: number[]; ny: number[]; theta: number[]; right: number[]; left: number[]; count: number; length: number }
 interface RawTrack { x: number[]; y: number[]; right: number[]; left: number[] }
 
-const RAW: Record<string, RawTrack> = { Monza: monzaRaw }
+const rawCache = new Map<string, RawTrack | null>()
 const cache = new Map<string, Model>()
 
-export const hasTrackModel = (track: string) => track in RAW
+function parseCsv(content: string): RawTrack | null {
+  const raw: RawTrack = { x: [], y: [], right: [], left: [] }
+  for (const line of content.split(/\r?\n/)) {
+    if (!line || line.startsWith('#')) continue
+    const [x, y, right, left] = line.split(',').map(Number)
+    if (![x, y, right, left].every(Number.isFinite)) return null
+    raw.x.push(x); raw.y.push(y); raw.right.push(right); raw.left.push(left)
+  }
+  return raw.x.length > 20 ? raw : null
+}
+
+function rawTrack(track: string): RawTrack | null {
+  if (track === 'Monza') return monzaRaw
+  if (!rawCache.has(track)) {
+    const csv = trackCenterlineCsv(track)
+    rawCache.set(track, csv ? parseCsv(csv) : null)
+  }
+  return rawCache.get(track) ?? null
+}
+
+export const hasTrackModel = (track: string) => rawTrack(track) !== null
 
 function buildModel(track: string): Model {
-  const raw = RAW[track]
+  const raw = rawTrack(track)!
   const n = raw.x.length
   const seg = Array.from({ length: n }, (_, i) => Math.hypot(raw.x[(i + 1) % n] - raw.x[i], raw.y[(i + 1) % n] - raw.y[i]))
   const total = seg.reduce((a, b) => a + b, 0)
@@ -138,7 +159,7 @@ function lapPositions(model: Model, trace: Pt[], fit: Alignment): Pt[] {
     const index = fit.shift + model.count * i / (n - 1)
     const k = wrap(Math.round(index), model.count)
     const limited = Math.max(-model.right[k] * 0.9, Math.min(model.left[k] * 0.9, v - gap * i / (n - 1)))
-    return at(model, index, limited)
+    return at(model, index, limited * MAP_WIDTH_VISUAL_SCALE)
   })
 }
 
@@ -168,15 +189,29 @@ export function fitToTrack(track: string, traces: (Pt[] | null)[]): Fitted | nul
   const cos = Math.cos(angle)
   const sin = Math.sin(angle)
   const turn = (p: Pt): Pt => ({ x: origin.x + (p.x - origin.x) * cos - (p.y - origin.y) * sin, y: origin.y + (p.x - origin.x) * sin + (p.y - origin.y) * cos })
+  // Edges are drawn at the same exaggerated width as the pre-flight map.
   const edge = (side: 1 | -1) => model.c.map((c, i) => {
-    const width = side > 0 ? model.left[i] : model.right[i]
+    const width = (side > 0 ? model.left[i] : model.right[i]) * MAP_WIDTH_VISUAL_SCALE
     return turn({ x: c.x + side * model.nx[i] * width, y: c.y + side * model.ny[i] * width })
   })
+  const ideal = (): Pt[] | null => {
+    const line = idealLine(track)
+    if (!line) return null
+    const samples = line.lateral.length
+    return model.c.map((_, i) => {
+      const position = i * samples / model.count
+      const base = Math.floor(position)
+      const fraction = line.lateral[base % samples] + (line.lateral[(base + 1) % samples] - line.lateral[base % samples]) * (position - base)
+      const width = fraction >= 0 ? model.left[i] : model.right[i]
+      return turn(at(model, i, fraction * width * line.usableWidth * MAP_WIDTH_VISUAL_SCALE))
+    })
+  }
   return {
     laps: results.map((lap) => lap && lap.map(turn)),
     left: edge(1),
     right: edge(-1),
     centre: model.c.map(turn),
     shift: lead.shift,
+    ideal,
   }
 }

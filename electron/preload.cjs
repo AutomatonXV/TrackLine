@@ -15,14 +15,7 @@ contextBridge.exposeInMainWorld('fastrack', {
   getSetup: () => ipcRenderer.invoke('setup:get'),
   importSetup: () => ipcRenderer.invoke('setup:import'),
   clearSetup: () => ipcRenderer.invoke('setup:clear'),
-  getPendingSetupFeedback: () => ipcRenderer.invoke('setup:pending-feedback'),
-  submitSetupFeedback: (sessionId, issue, tyres) => ipcRenderer.invoke('setup:submit-feedback', { sessionId, issue, tyres }),
-  dismissSetupFeedback: (sessionId) => ipcRenderer.invoke('setup:dismiss-feedback', sessionId),
-  onSetupFeedback: (callback) => {
-    const handler = (_event, feedback) => callback(feedback)
-    ipcRenderer.on('setup:feedback', handler)
-    return () => ipcRenderer.removeListener('setup:feedback', handler)
-  },
+  tuneSetup: (payload) => ipcRenderer.invoke('setup:tune', payload),
   liveStatus: () => ipcRenderer.invoke('live:status'),
   reconnectAcc: () => ipcRenderer.invoke('live:reconnect'),
   saveLiveSettings: (patch) => ipcRenderer.invoke('live:settings', patch),

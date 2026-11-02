@@ -27,8 +27,10 @@ test('generates finite corner and racing-line guidance for every bundled circuit
       assert.equal(guide.track, track)
       assert.equal(guide.centerline.length, 1200)
       assert.equal(guide.racingLine.length, 1200)
-      assert.ok(guide.lengthMeters >= expectedLength[track][0] && guide.lengthMeters <= expectedLength[track][1], `${track}: ${guide.lengthMeters} m`)
-      assert.ok(guide.corners.length >= expectedCorners[track][0] && guide.corners.length <= expectedCorners[track][1], `${track}: ${guide.corners.length} turns`)
+      if (expectedLength[track]) assert.ok(guide.lengthMeters >= expectedLength[track][0] && guide.lengthMeters <= expectedLength[track][1], `${track}: ${guide.lengthMeters} m`)
+      else assert.ok(guide.lengthMeters > 2000 && guide.lengthMeters < 8000, `${track}: ${guide.lengthMeters} m`)
+      if (expectedCorners[track]) assert.ok(guide.corners.length >= expectedCorners[track][0] && guide.corners.length <= expectedCorners[track][1], `${track}: ${guide.corners.length} turns`)
+      else assert.ok(guide.corners.length >= 4, `${track}: ${guide.corners.length} turns`)
       for (const edge of [guide.leftEdge, guide.rightEdge]) {
         assert.equal(edge.length, guide.centerline.length)
         for (const point of edge) {
@@ -60,8 +62,8 @@ test('generates finite corner and racing-line guidance for every bundled circuit
       speedMps: Array(480).fill(50),
       throttlePercent: Array(480).fill(100),
       brakePercent: Array(480).fill(0),
-      lateralAccelerationMps2: Array(480).fill(13),
-      longitudinalAccelerationMps2: Array(480).fill(4),
+      lateralAccelerationMps2: Array(480).fill(21),
+      longitudinalAccelerationMps2: Array(480).fill(5),
     }
     const calibratedOptimizer = createRacingLineOptimizer(space, 17, telemetry)
     for (let iteration = 0; iteration < 48; iteration += 1) {

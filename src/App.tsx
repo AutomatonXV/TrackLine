@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, DragEvent, PointerEvent as ReactPointerEvent } from 'react'
-import { Activity, ChevronLeft, ChevronRight, Crosshair, FileUp, Map, Navigation, Minus, Pause, Play, Plus, TriangleAlert, X } from 'lucide-react'
+import { Activity, ChevronLeft, ChevronRight, Crosshair, FileUp, Map, Navigation, Minus, Pause, Play, Plus, Route, TriangleAlert, X } from 'lucide-react'
 import { fitToTrack, hasTrackModel } from './trackMap'
 import { sectorMarkers } from './data/sectors'
 import { HudGauge } from './Hud'
@@ -14,7 +14,12 @@ const N = 480
 const SLOW = '#ff3b30'
 const FAST = '#34c759'
 const NEUTRAL = '#9aa0aa'
-const tracks = ['Monza', 'Spa-Francorchamps', 'Nürburgring GP']
+const tracks = [
+  'Monza', 'Spa-Francorchamps', 'Nürburgring GP', 'Donington Park', 'Imola', 'Kyalami', 'Laguna Seca',
+  'Misano', 'Mount Panorama', 'Oulton Park', 'Paul Ricard', 'Snetterton', 'Valencia', 'Watkins Glen', 'Zolder',
+  'Circuit of the Americas', 'Brands Hatch', 'Hungaroring', 'Barcelona', 'Indianapolis', 'Silverstone',
+  'Red Bull Ring', 'Zandvoort', 'Suzuka',
+]
 const cars = ['McLaren 720S GT3 Evo', 'Nissan GT-R Nismo GT3']
 
 type SlotKey = 'ref' | 'mine'
@@ -38,6 +43,27 @@ function trackLabel(name: string) {
   if (normalized.includes('nurburgring')) return 'Nürburgring GP'
   if (normalized.includes('spa')) return 'Spa-Francorchamps'
   if (normalized.includes('monza')) return 'Monza'
+  if (normalized.includes('donington')) return 'Donington Park'
+  if (normalized.includes('imola')) return 'Imola'
+  if (normalized.includes('kyalami')) return 'Kyalami'
+  if (normalized.includes('laguna')) return 'Laguna Seca'
+  if (normalized.includes('misano')) return 'Misano'
+  if (normalized.includes('panorama') || normalized.includes('bathurst')) return 'Mount Panorama'
+  if (normalized.includes('oulton')) return 'Oulton Park'
+  if (normalized.includes('paul ricard')) return 'Paul Ricard'
+  if (normalized.includes('snetterton')) return 'Snetterton'
+  if (normalized.includes('valencia') || normalized.includes('tormo')) return 'Valencia'
+  if (normalized.includes('watkins')) return 'Watkins Glen'
+  if (normalized.includes('zolder')) return 'Zolder'
+  if (normalized.includes('cota') || normalized.includes('americas')) return 'Circuit of the Americas'
+  if (normalized.includes('brands hatch')) return 'Brands Hatch'
+  if (normalized.includes('hungaroring')) return 'Hungaroring'
+  if (normalized.includes('barcelona') || normalized.includes('catalunya')) return 'Barcelona'
+  if (normalized.includes('indianapolis') || normalized.includes('indianpolis')) return 'Indianapolis'
+  if (normalized.includes('silverstone')) return 'Silverstone'
+  if (normalized.includes('red bull')) return 'Red Bull Ring'
+  if (normalized.includes('zandvoort')) return 'Zandvoort'
+  if (normalized.includes('suzuka')) return 'Suzuka'
   return tracks.find((track) => normalizedName(track) === normalized) || name
 }
 
@@ -300,6 +326,7 @@ export default function App() {
   const [playing, setPlaying] = useState(false)
   const [rate, setRate] = useState(1)
   const [showLoss, setShowLoss] = useState(false)
+  const [showIdeal, setShowIdeal] = useState(false)
   const [pane, setPane] = useState(360)
   const paneDrag = useRef<{ x: number; w: number } | null>(null)
   const [showMini, setShowMini] = useState(true)
@@ -327,17 +354,12 @@ export default function App() {
     if (other) {
       const a = identity(summary)
       const b = identity(other.summary)
-      const wrongCar = a.car !== b.car
-      const wrongTrack = a.track !== b.track
-      if (wrongCar || wrongTrack) {
+      if (a.track !== b.track) {
         const which = key === 'ref' ? 'reference' : 'my'
-        const title = wrongCar && wrongTrack ? 'Different car and track' : wrongCar ? 'Different cars' : 'Different tracks'
-        const detail = wrongCar && wrongTrack
-          ? `The ${which} lap is ${a.car} at ${a.track}, but the other lap is ${b.car} at ${b.track}.`
-          : wrongCar
-            ? `The ${which} lap is the ${a.car}, but the other lap is the ${b.car}. Both laps must use the same car.`
-            : `The ${which} lap was set at ${a.track}, but the other lap was set at ${b.track}. Both laps must be on the same track.`
-        setNotice({ title, body: `${detail} Clear the other lap first if you want to switch.` })
+        setNotice({
+          title: 'Different tracks',
+          body: `The ${which} lap was set at ${a.track}, but the other lap was set at ${b.track}. Both laps must be on the same track. Clear the other lap first if you want to switch.`,
+        })
         return
       }
     }
@@ -357,23 +379,6 @@ export default function App() {
     const summary = await window.fastrack.describeLap(window.fastrack.pathForFile(file))
     if (!summary) { setNotice({ title: "This file can't be read", body: `${file.name} could not be opened.` }); return }
     acceptSummary(key, summary)
-  }
-
-  const useFastestAsReference = async () => {
-    const mineSlot = slots.mine
-    if (!mineSlot) return
-    const want = identity(mineSlot.summary)
-    const library = await window.fastrack.library()
-    const matches = library.filter((lap) => {
-      if (lap.error || !(lap.lapTime > 0)) return false
-      const id = identity(lap)
-      return id.car === want.car && id.track === want.track
-    })
-    if (!matches.length) {
-      setNotice({ title: 'No reference found', body: `No ${want.car} laps at ${want.track} were found in Documents\\Assetto Corsa Competizione\\MoTeC.` })
-      return
-    }
-    acceptSummary('ref', matches.reduce((a, b) => b.lapTime < a.lapTime ? b : a))
   }
 
   // Keeps Electron from navigating to a file that is dropped outside a slot.
@@ -411,8 +416,7 @@ export default function App() {
   const geo = useMemo(() => {
     const source = (slots.ref ?? slots.mine)?.summary
     const trackName = source ? identity(source).track : ''
-    const needsFit = [ref, mine].some((lap) => lap?.positionSource === 'estimated')
-    const fitted = needsFit && hasTrackModel(trackName)
+    const fitted = hasTrackModel(trackName)
       ? fitToTrack(trackName, [
         refPoints && refPoints.every((p) => Number.isFinite(p.x) && Number.isFinite(p.y)) ? refPoints.map((p) => ({ x: p.x as number, y: p.y as number })) : null,
         minePoints && minePoints.every((p) => Number.isFinite(p.x) && Number.isFinite(p.y)) ? minePoints.map((p) => ({ x: p.x as number, y: p.y as number })) : null,
@@ -423,7 +427,7 @@ export default function App() {
       minePoints && orient(minePoints, mine?.positionSource ?? 'measured'),
     ]
     const all = [...oriented.flatMap((points) => points || []), ...(fitted ? [...fitted.left, ...fitted.right] : [])]
-    if (all.length < 2) return { ref: null, mine: null, edges: null, fitted: false }
+    if (all.length < 2) return { ref: null, mine: null, edges: null, ideal: null, fitted: false }
     const minX = Math.min(...all.map((point) => point.x))
     const maxX = Math.max(...all.map((point) => point.x))
     const minY = Math.min(...all.map((point) => point.y))
@@ -436,8 +440,10 @@ export default function App() {
       : null
     const project = (points: { x: number; y: number }[]) => points.map((p) => `${(xOffset + (p.x - minX) / span * 900).toFixed(1)},${(yOffset + (maxY - p.y) / span * 900).toFixed(1)}`).join(' ')
     const edges = fitted ? { left: project([...fitted.left, fitted.left[0]]), right: project([...fitted.right, fitted.right[0]]) } : null
-    return { ref: build(refPoints, oriented[0]), mine: build(minePoints, oriented[1]), edges, fitted: !!fitted }
-  }, [refPoints, minePoints, ref, mine, slots])
+    const idealPts = showIdeal && fitted ? fitted.ideal() : null
+    const ideal = idealPts ? project([...idealPts, idealPts[0]]) : null
+    return { ref: build(refPoints, oriented[0]), mine: build(minePoints, oriented[1]), edges, ideal, fitted: !!fitted }
+  }, [refPoints, minePoints, ref, mine, slots, showIdeal])
 
   const trackKey = slots.ref || slots.mine ? identity((slots.ref ?? slots.mine)!.summary).track : ''
 
@@ -647,7 +653,6 @@ export default function App() {
       <div className="brand"><span className="brand-mark"><Activity size={16} strokeWidth={2.5} /></span><span className="brand-word">TrackLine</span></div>
       <SlotCard label="MY LAP" swatch={mineColor} slot={slots.mine} onPick={() => void pickSlot('mine')} onClear={() => clearSlot('mine')} onLap={(index) => changeLap('mine', index)} onDropFiles={(files) => void dropOnSlot('mine', files)} />
       <SlotCard label="REFERENCE" swatch="#ffffff" slot={slots.ref} onPick={() => void pickSlot('ref')} onClear={() => clearSlot('ref')} onLap={(index) => changeLap('ref', index)} onDropFiles={(files) => void dropOnSlot('ref', files)} />
-      {slots.mine && !slots.ref && <button className="use-fastest" onClick={() => void useFastestAsReference()}>Use my fastest as reference</button>}
       <button className={`preflight-toggle${preflight ? ' active' : ''}`} onClick={() => setPreflight((value) => !value)}><Map size={14} /> {preflight ? 'LAP ANALYSIS' : 'PRE-FLIGHT'}</button>
       <div className="session">{tracksLabel ? <><b>{tracksLabel.track}</b><span>{tracksLabel.car}</span></> : <span>No laps open</span>}</div>
       <LivePanel />
@@ -659,6 +664,7 @@ export default function App() {
         onWheel={(event) => setZoom((value) => Math.max(0.6, Math.min(20, value * (event.deltaY < 0 ? 1.12 : 0.89))))}>
         <g ref={groupRef} transform={`translate(${view.x} ${view.y}) translate(500 500) scale(${zoom}) translate(-500 -500)`}>
           {geo.edges && <><path d={`M${geo.edges.left}Z M${geo.edges.right}Z`} className="track-fill" fillRule="evenodd" /><polyline points={geo.edges.left} className="track-edge" /><polyline points={geo.edges.right}           className="track-edge" /></>}
+          {geo.ideal && <polyline points={geo.ideal} className="line-ideal" />}
           {showLoss && analysis && geo.ref && analysis.hotspots.map((segment) => <polyline key={segment.a} points={polyline(geo.ref, segment.a, segment.b)} className="loss-line" />)}
           {section && baseGeo && <polyline points={polyline(baseGeo, section.a, section.b)} className="section-line" />}
           {geo.ref && <polyline points={polyline(geo.ref, 0, N - 1)} className="line-ref" />}
@@ -726,6 +732,7 @@ export default function App() {
 
       <div className="map-tools">
         <button className={`wide ${showLoss ? 'active' : ''}`} disabled={!analysis} title={analysis ? 'Highlight the smallest stretches where you lose the most time' : 'Open both laps to find time loss'} onClick={() => setShowLoss((value) => !value)}><TriangleAlert size={14} /> TIME LOSS</button>
+        <button className={`wide ${showIdeal ? 'active' : ''}`} disabled={!geo.fitted} title={geo.fitted ? 'Overlay the pre-flight ideal line' : 'The ideal line needs a lap on a supported track'} onClick={() => setShowIdeal((value) => !value)}><Route size={14} /> IDEAL LINE</button>
         <button title="Zoom in" onClick={() => setZoom((value) => Math.min(20, value * 1.2))}><Plus size={15} /></button>
         <button title="Zoom out" onClick={() => setZoom((value) => Math.max(0.6, value / 1.2))}><Minus size={15} /></button>
         <button title="Reset view" onClick={() => { setZoom(1); setView({ x: 0, y: 0 }) }}><Crosshair size={15} /></button>

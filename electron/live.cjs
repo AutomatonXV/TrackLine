@@ -5,7 +5,7 @@ const { SessionRecorder } = require('./session-recorder.cjs')
 
 const HUD_ASPECT = 1
 const HUD_SIZE = 300
-const DEFAULT_SETTINGS = { hudEnabled: true, hudMode: 'overlay', coachMarkers: true, swapLR: false, leadSeconds: 0.25, voiceEnabled: true, voiceVolume: 0.8, cooldownSeconds: 1.5 }
+const DEFAULT_SETTINGS = { hudEnabled: true, hudMode: 'overlay', coachMarkers: false, swapLR: false, leadSeconds: 0.25, voiceEnabled: true, voiceVolume: 0.8, cooldownSeconds: 1.5 }
 const SEND_INTERVAL_MS = 30
 
 function createLive({ electron, readState, writeState, library, parseLap, preloadPath, loadRenderer, getMainWindow }) {
@@ -50,16 +50,7 @@ function createLive({ electron, readState, writeState, library, parseLap, preloa
 
   const sendStatus = () => broadcast('live:status', status())
 
-  function saveFeedback(feedback) {
-    if (!feedback) return
-    const state = readState()
-    state.setupFeedbackQueue = [...(state.setupFeedbackQueue || []), feedback]
-    writeState(state)
-    const win = getMainWindow()
-    if (win && !win.isDestroyed()) win.webContents.send('setup:feedback', feedback)
-  }
-
-  function finishSession(now = Date.now()) { saveFeedback(sessionRecorder.finish(now)) }
+  function finishSession(now = Date.now()) { sessionRecorder.finish(now) }
 
   function selectReference(frame) {
     context = { car: frame.carModel, track: frame.track }
@@ -95,7 +86,7 @@ function createLive({ electron, readState, writeState, library, parseLap, preloa
     sendStatus()
   })
   reader.on('frame', (frame) => {
-    if (frame.status === 'live') saveFeedback(sessionRecorder.update(frame, frame.t))
+    if (frame.status === 'live') sessionRecorder.update(frame, frame.t)
     else if (frame.status !== 'pause') finishSession(frame.t)
     if (frame.carModel !== context.car || frame.track !== context.track) {
       selectReference(frame)

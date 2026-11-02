@@ -55,6 +55,7 @@ interface LiveLateral {
 
 interface LiveFrame {
   state: 'active' | 'paused' | 'noReference'
+  hasReference?: boolean
   throttle?: PedalReading
   brake?: PedalReading
   lateral?: LiveLateral
@@ -96,11 +97,23 @@ interface SetupQuizTyres {
   conditions: 'dry' | 'wet'
 }
 
-interface SetupVariant {
+interface TuneAnswers {
+  entry?: 'understeer' | 'oversteer' | 'ok'
+  mid?: 'understeer' | 'oversteer' | 'ok'
+  exit?: 'understeer' | 'oversteer' | 'ok'
+  speed?: 'low' | 'high' | 'both'
+  braking?: 'ok' | 'rearLocks' | 'frontLocks'
+  brakeTemp?: 'ok' | 'hot' | 'cold'
+  kerbs?: 'ok' | 'unsettled' | 'bottoming'
+  straights?: 'ok' | 'draggy' | 'needsDownforce'
+  tyres?: SetupQuizTyres & { frontSpreadC?: number; rearSpreadC?: number }
+}
+
+interface TuneResult {
   setup: SetupSummary
-  issue: string
-  description: string
-  change: string
+  changes: string[]
+  skipped: string[]
+  advice: string[]
 }
 
 interface LiveStatus {
@@ -138,9 +151,6 @@ interface Window {
     getSetup: () => Promise<{ setup: SetupSummary | null; error: string }>
     importSetup: () => Promise<SetupSummary | null>
     clearSetup: () => Promise<void>
-    getPendingSetupFeedback: () => Promise<SetupFeedback | null>
-    submitSetupFeedback: (sessionId: string, issue: SetupIssue, tyres?: SetupQuizTyres) => Promise<SetupVariant>
-    dismissSetupFeedback: (sessionId: string) => Promise<void>
-    onSetupFeedback: (callback: (feedback: SetupFeedback) => void) => () => void
+    tuneSetup: (payload: { car: string; track: string; answers: TuneAnswers }) => Promise<TuneResult>
   }
 }

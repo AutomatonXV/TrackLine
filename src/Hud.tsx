@@ -205,7 +205,7 @@ export default function Hud() {
   const grip = useRef<{ x: number; width: number } | null>(null)
   const edit = Boolean(status?.hud.edit)
   const windowed = status?.settings.hudMode === 'window'
-  const showReference = status?.settings.coachMarkers !== false
+  const showReference = status?.settings.coachMarkers === true && frame?.hasReference !== false
   const shownFrame = frame?.state === 'active' ? frame : edit ? DEMO : frame
 
   useEffect(() => {
